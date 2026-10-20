@@ -1,12 +1,10 @@
-﻿# Architecture
+# Architecture
 
-## Repository baseline
+## Repository and initialized stack
 
-The repository currently contains only `README.md` and Git metadata. No application source, framework, package manifest, or existing runtime stack was found during INV-001 inspection. No application foundation has been initialized.
+The repository has a minimal Next.js App Router foundation under `src/app`. The initialized stack is **Next.js 16.4.2 + React 19.3.1 + TypeScript 5.9.3 (strict) + Tailwind CSS 4.3.3 + ESLint 9.39.5**, managed with npm and Node.js 24 (`engines.node: ">=24 <25"`). The package lock records the resolved dependency tree.
 
-## Proposed future MVP stack
-
-If implementation begins, the proposed stack is **Next.js + TypeScript + PostgreSQL + Prisma**. This is a proposal, not an installed or initialized stack. INV-001 does not install packages or initialize a framework.
+The application currently contains only a neutral `Hiiiive Billing` placeholder home page and root layout. No database or ORM is installed. PostgreSQL and Prisma remain future options described conceptually in `DATABASE.md`; they are not part of this foundation.
 
 ## Architectural guardrails
 

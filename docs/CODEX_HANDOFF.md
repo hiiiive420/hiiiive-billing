@@ -1,52 +1,66 @@
-﻿# Codex Handoff
+# Codex Handoff
 
-- **Task ID:** INV-001 — Repository Baseline & Project Guardrails
+- **Task ID:** INV-002A — Runtime Baseline & Dependency Audit
 - **Status:** Complete
 
 ## What changed
 
-Added repository contribution guardrails and baseline architecture, business rules, security guidance, conceptual database relationships, and this handoff record. No application code was changed.
+Verified the active Node 24 runtime, declared the supported Node range, added `.nvmrc`, inspected the npm audit report, and documented the remaining development-only advisory. No dependency updates were applied because the available npm fix is a breaking downgrade.
 
 ## Files changed
 
-- `AGENTS.md` — implementation and workflow rules.
-- `docs/ARCHITECTURE.md` — repository observations, proposed stack, and architecture guardrails.
-- `docs/BUSINESS-RULES.md` — permanent invoice, payment, recurring, approval, calculation, and audit rules.
-- `docs/SECURITY.md` — server-side trust, authorization, tenant isolation, financial integrity, and audit guidance.
-- `docs/DATABASE.md` — conceptual entities and relationships only.
+- `package.json` — added Node engine range `>=24 <25`.
+- `package-lock.json` — synchronized root package metadata.
+- `.nvmrc` — selects Node 24.
+- `docs/ARCHITECTURE.md` — records the Node 24 runtime baseline.
 - `docs/CODEX_HANDOFF.md` — this task record.
 
-## Existing repo/stack observations
+## Runtime and dependencies
 
-Repository path: `D:\Billing_Hive\hiiiive-billing`. Inspection found only `README.md` (`# hiiiive-billing`) and Git metadata. No application source, framework, package manifest, or existing stack was detected. Proposed future stack: Next.js + TypeScript + PostgreSQL + Prisma. Nothing was installed or initialized.
+- Node.js: v24.20.0
+- npm: 11.19.0
+- Dependency versions were not changed.
 
-## Database changes
+## Commands/checks and results
 
-None. Conceptual entities and relationships only; no schema or migrations created.
+- Read `AGENTS.md` and all files under `docs/` before changes.
+- `node --version` — v24.20.0; satisfies `>=24 <25`.
+- `npm --version` — 11.19.0.
+- `npm pkg set 'engines.node=>=24 <25'` — completed.
+- `npm install --package-lock-only` — completed; lockfile synchronized; npm noted five high-severity audit findings.
+- `npm run typecheck` — passed.
+- `npm run lint` — passed.
+- `npm run build` — passed; production build prerendered `/` and `/_not-found`.
+- `npm audit` — five high-severity findings, all propagating from one `braces` advisory in a development-only dependency path; zero critical, moderate, or low findings.
 
-## Commands/checks run and results
+## Audit findings
 
-- `Get-ChildItem -Force` — inspected repository root; found `.git` and `README.md`.
-- `Get-Content -Raw README.md` — read README.
-- `rg --files` and targeted `rg --files -g ...` — found only README; no app/framework manifests or existing docs.
-- `git status --short --branch` — repository was clean on `main` tracking `origin/main` before documentation changes.
-- No tests or application checks were run; no application code exists to test.
+All five reported package entries are **high severity** and **development-only** because they are within `eslint-config-next`, a dev dependency. They trace to the same advisory: `braces` is vulnerable to stack-exhaustion denial of service through deeply nested patterns (GHSA-vfj7-8cjw-p6xm).
+
+| Reported package | Dependency path from direct dev dependency | Exposure | Severity | Why it remains |
+| --- | --- | --- | --- | --- |
+| `eslint-config-next` | direct dev dependency | Development | High | Advisory is inherited through its Next ESLint plugin; npm only offers a breaking downgrade to 14.2.35. |
+| `@next/eslint-plugin-next` | `eslint-config-next > @next/eslint-plugin-next` | Development | High | Depends on affected `fast-glob`; no compatible patched chain was available. |
+| `fast-glob` | `eslint-config-next > @next/eslint-plugin-next > fast-glob` | Development | High | Depends on affected `micromatch`; no compatible patched chain was available. |
+| `micromatch` | `eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch` | Development | High | Depends on affected `braces`; registry reports `braces@3.0.3` as latest. |
+| `braces` | `eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch > braces` | Development | High | The advisory affects the available 3.0.3 version. No patched semver-compatible braces version was available. |
+
+No `npm audit fix --force` was run. The audit's proposed fix downgrades `eslint-config-next` to 14.2.35, a breaking major downgrade inconsistent with Next.js 16. No safe, non-breaking dependency update was found or applied.
 
 ## Security considerations
 
-Documented server-side authorization and organization scoping, untrusted browser inputs, server-side financial operations, secret handling, approved-and-issued email gate, and immutable audit events. No runtime security controls were implemented in this documentation task.
+The remaining advisory is in tooling used during development/linting, not a production dependency path. It concerns a denial-of-service risk from deeply nested patterns. Keep the development tooling environment trusted and update when a compatible patched dependency chain becomes available. No secrets or application security controls were changed.
 
 ## Decisions made
 
-- Marked the proposed stack as Next.js + TypeScript + PostgreSQL + Prisma because no application foundation is present.
-- Treated the supplied permanent business rules as authoritative; left undefined accounting treatment to an explicit future decision.
-- Kept database documentation conceptual only.
+- Kept the Next.js 16-compatible ESLint dependency chain rather than applying npm's breaking downgrade suggestion.
+- Added the Node 24 range to `package.json`, selected major version 24 in `.nvmrc`, and documented the baseline in architecture.
+- Left dependency versions unchanged because there was no safe, non-breaking update resolving the advisory.
 
 ## Known issues
 
-- No application foundation or runtime checks exist yet.
-- No detailed authorization roles or exceptional accounting treatment were specified; implementation must obtain decisions instead of inferring them.
+- The five npm audit findings described above remain until a compatible patched `braces` dependency chain is published or the compatible Next.js ESLint dependency chain updates.
 
 ## Explicitly not implemented
 
-No package installation, framework initialization, migrations, UI, APIs, authentication, invoice functionality, or application-code refactoring.
+No application features, database, authentication, APIs, invoice logic, UI changes, or unrelated dependency updates.
