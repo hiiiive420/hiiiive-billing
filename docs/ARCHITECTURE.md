@@ -4,7 +4,11 @@
 
 The repository has a minimal Next.js App Router foundation under `src/app`. The initialized stack is **Next.js 16.4.2 + React 19.3.1 + TypeScript 5.9.3 (strict) + Tailwind CSS 4.3.3 + ESLint 9.39.5**, managed with npm and Node.js 24 (`engines.node: ">=24 <25"`). The package lock records the resolved dependency tree.
 
-The application currently contains only a neutral `Hiiiive Billing` placeholder home page and root layout. No database or ORM is installed. PostgreSQL and Prisma remain future options described conceptually in `DATABASE.md`; they are not part of this foundation.
+PostgreSQL access is configured with **Prisma ORM 7.10.1**, `@prisma/client`, the `@prisma/adapter-pg` driver adapter, and `pg`. The schema is at `prisma/schema.prisma`; the generated client is at `src/generated/prisma` and is regenerated with `npm run prisma:generate`. The schema currently has no business models. No migrations or database instances have been created or provisioned.
+
+The server-only reusable client is exposed through `getPrismaClient()` in `src/lib/prisma.ts`. It is initialized lazily when called, checks for `DATABASE_URL`, and does not connect during module import. Store the URL only in the server environment or an ignored `.env` file; never expose it to client code. `.env.example` contains only an empty `DATABASE_URL=` placeholder.
+
+The application currently contains only a neutral `Hiiiive Billing` placeholder home page and root layout.
 
 ## Architectural guardrails
 
