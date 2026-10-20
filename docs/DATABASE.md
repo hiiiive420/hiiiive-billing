@@ -1,8 +1,16 @@
-# Database
+﻿# Database
+
+## Local development and migration
+
+Local development uses the locally installed PostgreSQL server at `localhost:5432`. The database name is `hiiiive_billing`; connection details are kept in the ignored local `.env` file and are not documented here. Production database strategy remains undecided until deployment.
+
+The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It is applied to the local development database and creates only Organization, Client, ClientContact, and Service. `npm run db:migrate:status` reports that the database schema is up to date.
+
+Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords. No production database or deployment environment is configured.
 
 ## Implemented Prisma models
 
-The PostgreSQL schema in `prisma/schema.prisma` currently implements only `Organization`, `Client`, `ClientContact`, and `Service`. No migration has been created because no PostgreSQL instance is configured. These models are the schema foundation; server-side authorization and tenant scoping are still required in application code.
+The PostgreSQL schema in `prisma/schema.prisma` currently implements only `Organization`, `Client`, `ClientContact`, and `Service`. These models are the schema foundation; server-side authorization and tenant scoping are still required in application code.
 
 ### Organization
 
@@ -23,7 +31,7 @@ The PostgreSQL schema in `prisma/schema.prisma` currently implements only `Organ
 
 - UUID primary key and required `organizationId` and `clientId` foreign keys.
 - Name, optional email and phone, `billingContact` and `primaryContact` defaults false, `active` defaults true, and timestamps.
-- Its composite foreign key `(organizationId, clientId)` references `(organizationId, id)` on Client. The separate `organizationId` foreign key explicitly scopes the contact to an organization and the composite relationship prevents linking it to a client from another organization.
+- Its composite foreign key `(organizationId, clientId)` references `(organizationId, id)` on Client. The separate `organizationId` foreign key explicitly scopes the contact to an organization and the composite relationship prevents linking to a client from another organization.
 - Indexed by `(organizationId, clientId)`. Client and organization deletion are restricted while contacts exist.
 
 ### Service

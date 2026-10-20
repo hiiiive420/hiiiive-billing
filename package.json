@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
-    "prebuild": "prisma generate"
+    "prebuild": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:status": "prisma migrate status"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
