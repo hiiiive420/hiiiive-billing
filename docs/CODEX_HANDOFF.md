@@ -1,44 +1,49 @@
 # Codex Handoff
 
-- **Task ID:** INV-003A — Prisma Build Reproducibility
+- **Task ID:** INV-004 — Core Master Data Schema
 - **Status:** Complete
 
 ## What changed
 
-Added an npm `prebuild` hook that generates Prisma Client before production builds. Verified that a build recreates the intentionally ignored generated client directory after it is removed.
+Implemented the Prisma schema models for Organization, Client, ClientContact, and Service. Documented their fields, tenant relationships, indexes, delete behavior, and monetary precision. No migration or database instance was created.
 
 ## Files changed
 
-- `package.json` — added `prebuild: prisma generate`.
+- `prisma/schema.prisma` — added the four requested master-data models and tenant-scoped constraints.
+- `docs/DATABASE.md` — documents implemented models and distinguishes future conceptual entities.
 - `docs/CODEX_HANDOFF.md` — this task record.
 
 ## Packages/framework actually installed
 
-No packages or versions changed. Prisma CLI, client, and PostgreSQL adapter remain at 7.10.1.
+No package or version changes. Prisma CLI, `@prisma/client`, and `@prisma/adapter-pg` remain at 7.10.1.
 
 ## Commands/checks and results
 
-- Read `AGENTS.md` and all `docs/*` before changes.
-- Verified `src/generated/prisma/client.ts` is ignored by Git.
-- Removed only the verified `src/generated/prisma` directory.
-- `npm run build` — passed; npm ran `prebuild` first, Prisma Client 7.10.1 regenerated into `src/generated/prisma`, and Next.js production build completed.
-- Confirmed the regenerated `src/generated/prisma/client.ts` exists after the build.
+- Read `AGENTS.md` and all `docs/*` before implementation.
+- `npm exec prisma format` — passed; formatted `prisma/schema.prisma`.
+- `npm run prisma:validate` — passed; Prisma schema is valid.
+- `npm run prisma:generate` — passed; Prisma Client 7.10.1 generated successfully.
 - `npm run typecheck` — passed.
 - `npm run lint` — passed.
+- `npm run build` — passed; prebuild regenerated Prisma Client and the Next.js production build completed.
 
 ## Security considerations
 
-The generated client remains Git-ignored. No environment files, credentials, database configuration, or application features were changed. No `postinstall` hook was added.
+Business records carry `organizationId`. ClientContact has both an organization foreign key and a composite `(organizationId, clientId)` reference to Client, preventing cross-tenant client association at the schema level. All relations use restrictive deletion behavior. Server-side authorization and organization scoping remain required. No credentials or database connection were used.
 
 ## Decisions made
 
-- Used `prebuild` because it generates the ignored client at the point a production build needs it without changing install behavior.
-- Left Prisma versions, schema, database configuration, and architecture documentation unchanged.
+- UUID primary keys use PostgreSQL UUID columns.
+- Organization slug is unique. Client and Service names are not unique globally or tenant-wide; organization-scoped indexes support lookups without inventing name uniqueness rules.
+- Client has a compound unique `(organizationId, id)` key to support an explicitly tenant-scoped ClientContact foreign key.
+- Service default unit price uses PostgreSQL `Decimal(19,4)` (15 integer digits and 4 fractional digits), never Float. Currency-specific rounding and invoice totals remain undefined.
+- All foreign-key delete behavior is `Restrict` to prevent indirect deletion of historical or future related records.
+- No migration was created because no PostgreSQL instance is configured.
 
 ## Known issues
 
-None identified for this task.
+No PostgreSQL database is configured, so the schema has not been applied to a live database. No migration exists yet.
 
 ## Explicitly not implemented
 
-No models, migrations, database configuration changes, application features, or package/version changes.
+No User/Auth, Invoice, InvoiceItem, InvoiceSequence, Payment, InvoiceRelation, recurring billing, approvals, audit events, email, APIs, UI, seed data, or migrations.

@@ -6,3 +6,67 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Organization {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  slug           String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  clients        Client[]
+  clientContacts ClientContact[]
+  services       Service[]
+}
+
+model Client {
+  id                                  String          @id @default(uuid()) @db.Uuid
+  organizationId                      String          @db.Uuid
+  name                                String
+  businessRegistrationOrTaxIdentifier String?
+  phone                               String?
+  email                               String?
+  billingAddress                      String?
+  notes                               String?
+  active                              Boolean         @default(true)
+  createdAt                           DateTime        @default(now())
+  updatedAt                           DateTime        @updatedAt
+  organization                        Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  contacts                            ClientContact[]
+
+  // Enables a contact foreign key that enforces matching tenant and client.
+  @@unique([organizationId, id])
+  @@index([organizationId, name])
+}
+
+model ClientContact {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  clientId       String       @db.Uuid
+  name           String
+  email          String?
+  phone          String?
+  billingContact Boolean      @default(false)
+  primaryContact Boolean      @default(false)
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  client         Client       @relation(fields: [organizationId, clientId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, clientId])
+}
+
+model Service {
+  id               String       @id @default(uuid()) @db.Uuid
+  organizationId   String       @db.Uuid
+  name             String
+  description      String?
+  defaultUnitPrice Decimal?     @db.Decimal(19, 4)
+  currencyCode     String       @default("LKR") @db.VarChar(3)
+  active           Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, name])
+}
