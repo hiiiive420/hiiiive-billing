@@ -12,9 +12,9 @@ Invoice issuance is implemented in the server-only domain module `src/lib/invoic
 
 Payment recording and invoice supersession are implemented in `src/lib/invoices/record-payment.ts` and `src/lib/invoices/rework-invoice.ts`. Both are server-only transaction services with PostgreSQL integration coverage. Payment records and replacement relations preserve financial history; supersession does not transfer or reverse payments.
 
-Invoice template identities and immutable-intent versions are represented in the database. Invoices may reference the exact template version used, while existing invoices retain a nullable reference. The schema does not add template rendering or change issuance behavior; template configuration is structured JSON consumed only by trusted application renderers.
+Invoice template identities and immutable versions are represented in the database. Invoices may reference the exact template version used, while existing invoices retain a nullable reference. The trusted renderer registry maps known keys such as `hiiiive-default` to application components and rejects unknown keys. The Hiiiive renderer validates structured configuration and formats decimal strings without recalculating accounting values. `/dev/invoice-preview` renders static sample data only and returns 404 in production; it does not query the database. PDF generation and multi-page layout remain future work.
 
-The application currently contains only a neutral `Hiiiive Billing` placeholder home page and root layout.
+The application has a neutral `Hiiiive Billing` placeholder home page and root layout, plus the development-only invoice preview route.
 
 ## Architectural guardrails
 
@@ -28,3 +28,5 @@ The application currently contains only a neutral `Hiiiive Billing` placeholder 
 ## Main conceptual flow
 
 A recurring template or an authorized user can create an editable draft. Internal approval and issuance are required before a client invoice can be emailed. Issuance assigns a never-reused invoice number. Payments, supersession/rework, voiding, and write-off are recorded through authorized, auditable transitions without silently rewriting issued financial data. See `BUSINESS-RULES.md` and `DATABASE.md`.
+
+

@@ -4,7 +4,7 @@
 
 Local development uses the locally installed PostgreSQL server at `localhost:5432`. The database name is `hiiiive_billing`; connection details are kept in the ignored local `.env` file and are not documented here. Production database strategy remains undecided until deployment.
 
-The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), payments/reworked invoice relations (`add_payments_and_invoice_relations`), replacement lineage enforcement (`enforce_replacement_lineage`), and invoice template versioning (`add_invoice_template_versioning`). Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
+The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), payments/reworked invoice relations (`add_payments_and_invoice_relations`), replacement lineage enforcement (`enforce_replacement_lineage`), invoice template versioning (`add_invoice_template_versioning`), template version immutability (`enforce_template_version_immutability`), and optional invoice project titles (`add_invoice_project_title`). Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
 
 ## Implemented Prisma models
 
@@ -62,7 +62,7 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 
 ### Invoice
 
-- UUID primary key, required organization and client IDs, lifecycle/payment statuses, currency (`LKR` by default), optional invoice/due dates and issue timestamp.
+- UUID primary key, required organization and client IDs, optional `projectTitle`, lifecycle/payment statuses, currency (`LKR` by default), optional invoice/due dates and issue timestamp.
 - Optional `templateVersionId` references a version through `(organizationId, templateVersionId)` to `(organizationId, id)`. Existing invoices may keep it null. Future issuance logic will set the version used for the historical invoice; issuance behavior is not changed by this schema task.
 - Optional client name, billing address, email, and phone snapshots preserve the details used by the invoice if the Client record later changes.
 - Subtotal, discount amount, and grand total use `Decimal(19,4)` with zero defaults. No floating point money fields are used.
@@ -124,5 +124,7 @@ The following entities and relationships remain design guidance only; they are n
 - **Audit event** â€” immutable record of important actions, actor, timestamp, action, and relevant reason/metadata.
 
 These future entities must follow the business and security requirements in `BUSINESS-RULES.md` and `SECURITY.md`. Their exact persistence and accounting treatment remain future implementation decisions. Approval, audit events, recurring templates, and email attempts are not implemented.
+
+
 
 

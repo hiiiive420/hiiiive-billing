@@ -145,6 +145,7 @@ model Invoice {
   id                           String                  @id @default(uuid()) @db.Uuid
   organizationId               String                  @db.Uuid
   clientId                     String                  @db.Uuid
+  projectTitle                 String?
   templateVersionId            String?                 @db.Uuid
   invoiceNumber                String?
   lifecycleStatus              InvoiceLifecycleStatus  @default(DRAFT)

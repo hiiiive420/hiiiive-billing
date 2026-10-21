@@ -1,4 +1,4 @@
-# Security
+﻿# Security
 
 ## Trust boundaries
 
@@ -33,6 +33,7 @@ Authentication is not implemented. Future authentication may map an externally a
 
 - Template configuration is structured JSON presentation/branding data only. `rendererKey` selects a trusted application renderer; do not execute code from template data.
 - PostgreSQL rejects UPDATE and DELETE on template versions; changes must create a new version, preserving historical configurations even when unreferenced.
+- The renderer registry maps only trusted application renderer keys and rejects unknown keys. The development preview uses static sample data, performs no database reads, and returns 404 in production.
 - MVP1 does not support arbitrary user HTML/CSS uploads. Future SaaS custom templates require a separate security design covering sanitization and isolation before any such feature is implemented.
 
 ## Secrets and delivery
@@ -44,4 +45,5 @@ Authentication is not implemented. Future authentication may map an externally a
 ## Audit trail
 
 Record immutable audit events for important invoice actions, including actor, timestamp, action, and relevant reason or metadata. Restrict access to internal notes and operational details to authorized users.
+
 
