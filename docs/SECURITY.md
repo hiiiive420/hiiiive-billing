@@ -21,6 +21,8 @@ Authentication is not implemented. Future authentication may map an externally a
 - Calculate totals and assign invoice numbers on the server only. Never reuse an assigned invoice number.
 - Invoice issuance loads records by authorized `organizationId` and invoice ID, accepts no browser-supplied totals, status, date, or invoice number, and commits the conditional DRAFT transition and sequence reservation in one PostgreSQL transaction. Callers must derive organization scope from trusted server-side authorization context.
 - Issuance recalculates line totals, subtotal, and grand total, validates quantities, prices, and discounts, and snapshots client details from the database. Only DRAFT invoices may be issued; issued invoice dates and numbers are thereafter immutable.
+- Payment recording accepts only positive amounts for organization-scoped ISSUED invoices. It inserts the payment and recalculates payment status from recorded payment rows while holding the invoice row lock in one transaction; caller-supplied payment status is not accepted.
+- Supersession validates organization-scoped source and replacement states, then changes the source to SUPERSEDED and records REPLACED_BY relations atomically. It preserves source payment records and does not redistribute funds.
 - Treat persisted line totals and invoice totals as non-authoritative inputs until computed or verified by server logic. The invoice schema stores them as decimal values; browser-supplied totals must never be trusted.
 - Scope invoice, client, service, and invoice-item relations by organization. Composite foreign keys enforce tenant matching in the database.
 - Validate state transitions and approval authority on the server.

@@ -10,6 +10,8 @@ The production database strategy remains undecided until deployment. The server-
 
 Invoice issuance is implemented in the server-only domain module `src/lib/invoices/issue-invoice.ts`. It loads and validates a draft within its organization, recalculates line and invoice totals, snapshots current client details, reserves the organization's next number atomically, and commits the invoice and sequence update in one PostgreSQL transaction. Future server actions or API handlers must supply organization scope from trusted authorization context.
 
+Payment recording and invoice supersession are implemented in `src/lib/invoices/record-payment.ts` and `src/lib/invoices/rework-invoice.ts`. Both are server-only transaction services with PostgreSQL integration coverage. Payment records and replacement relations preserve financial history; supersession does not transfer or reverse payments.
+
 The application currently contains only a neutral `Hiiiive Billing` placeholder home page and root layout.
 
 ## Architectural guardrails

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --conditions=react-server --import tsx --test src/lib/invoices/issue-invoice.test.ts",
+    "test": "node --conditions=react-server --import tsx --test src/lib/invoices/issue-invoice.test.ts src/lib/invoices/payments-rework.test.ts",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",

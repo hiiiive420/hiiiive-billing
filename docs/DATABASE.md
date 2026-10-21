@@ -1,10 +1,10 @@
-# Database
+﻿# Database
 
 ## Local development and migration
 
 Local development uses the locally installed PostgreSQL server at `localhost:5432`. The database name is `hiiiive_billing`; connection details are kept in the ignored local `.env` file and are not documented here. Production database strategy remains undecided until deployment.
 
-The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. The RBAC foundation migration is `20261020153112_add_user_rbac_foundation` (`add_user_rbac_foundation`), and invoice core is added by `add_invoice_core`. Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
+The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), and payments/reworked invoice relations (`add_payments_and_invoice_relations`). Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
 
 ## Implemented Prisma models
 
@@ -79,6 +79,18 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 - Organization-scoped sequence row with key (`DEFAULT`), prefix (`I`), and `nextValue` (1) defaults; `(organizationId, key)` is unique.
 - This stores the next available organization-wide sequence number. The server-only issuance service atomically reserves and increments it in the same transaction as issuance; drafts do not consume sequence values. The Hiiiive MVP format is defined in `BUSINESS-RULES.md`.
 
+### Payment
+
+- Organization- and invoice-scoped payment record with positive amount (`Decimal(19,4)`), paid timestamp, `PaymentMethod`, optional reference/internal note, and timestamps.
+- A composite FK `(organizationId, invoiceId)` enforces tenant matching with Invoice. Deletion is restricted. Multiple payment rows per invoice are supported.
+- The server-only payment service inserts a payment and recalculates `Invoice.paymentStatus` from the recorded amount total under a transaction and invoice row lock. It does not change `grandTotal`. Overpayments remain recorded and marked PAID; refunds and credit handling are not implemented.
+
+### InvoiceRelation
+
+- Organization-scoped historical relation with source and target invoice IDs, `InvoiceRelationType` (`REPLACED_BY`), reason, and creation timestamp.
+- Composite FKs enforce that both source and target invoices belong to the relation's organization. Deletes are restricted. A source can have multiple target replacements, but `(organizationId, targetInvoiceId, relationType)` is unique so one replacement target cannot point back to multiple sources.
+- The supersede service atomically changes an ISSUED source to SUPERSEDED and adds relations to DRAFT replacements. It leaves replacement drafts unnumbered and preserves source payments without moving or reversing them.
+
 ### Money representation
 
 `Service.defaultUnitPrice` uses PostgreSQL `Decimal(19,4)`, not floating point. This allows up to 15 digits before the decimal point and four fractional digits, accommodating monetary unit rates that may need sub-cent precision. Currency-specific rounding and invoice-total behavior are not defined by this schema.
@@ -91,13 +103,11 @@ Every business record in this schema belongs to an organization. Tenant identifi
 
 The following entities and relationships remain design guidance only; they are not implemented in the Prisma schema yet:
 
-- **Invoice** — organization/client-owned financial snapshot with draft/issued lifecycle.
-- **Invoice line** — preserves the historical description, quantity, and price used on an invoice.
-- **Payment** — separate record associated with an invoice, allowing multiple and partial payments.
-- **Recurring invoice template** — organization/client-owned source for idempotently generated drafts.
-- **Approval** — records internal approval before an invoice can be sent.
-- **Invoice replacement link** — links an original invoice to one or more replacements with a reason.
-- **Email send attempt** — logs retryable delivery attempts for an approved and issued invoice.
-- **Audit event** — immutable record of important actions, actor, timestamp, action, and relevant reason/metadata.
+- **Invoice** â€” organization/client-owned financial snapshot with draft/issued lifecycle.
+- **Recurring invoice template** â€” organization/client-owned source for idempotently generated drafts.
+- **Approval** â€” records internal approval before an invoice can be sent.
+- **Email send attempt** â€” logs retryable delivery attempts for an approved and issued invoice.
+- **Audit event** â€” immutable record of important actions, actor, timestamp, action, and relevant reason/metadata.
 
-These future entities must follow the business and security requirements in `BUSINESS-RULES.md` and `SECURITY.md`. Their exact persistence and accounting treatment remain future implementation decisions. Payment records, approval, replacement links, audit events, templates, and email attempts are not implemented.
+These future entities must follow the business and security requirements in `BUSINESS-RULES.md` and `SECURITY.md`. Their exact persistence and accounting treatment remain future implementation decisions. Approval, audit events, recurring templates, and email attempts are not implemented.
+

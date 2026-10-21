@@ -27,6 +27,18 @@ enum InvoicePaymentStatus {
   PAID
 }
 
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CHEQUE
+  CARD
+  OTHER
+}
+
+enum InvoiceRelationType {
+  REPLACED_BY
+}
+
 model Organization {
   id               String                   @id @default(uuid()) @db.Uuid
   name             String
@@ -40,6 +52,8 @@ model Organization {
   invoices         Invoice[]
   invoiceItems     InvoiceItem[]
   invoiceSequences InvoiceSequence[]
+  payments         Payment[]
+  invoiceRelations InvoiceRelation[]
 }
 
 model User {
@@ -151,6 +165,9 @@ model Invoice {
   organization                 Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   client                       Client                 @relation(fields: [organizationId, clientId], references: [organizationId, id], onDelete: Restrict)
   items                        InvoiceItem[]
+  payments                     Payment[]
+  sourceRelations              InvoiceRelation[]      @relation("InvoiceRelationSource")
+  targetRelations              InvoiceRelation[]      @relation("InvoiceRelationTarget")
 
   // Enables tenant-safe composite foreign keys from invoice items.
   @@unique([organizationId, id])
@@ -193,4 +210,38 @@ model InvoiceSequence {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, key])
+}
+
+model Payment {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  invoiceId      String        @db.Uuid
+  amount         Decimal       @db.Decimal(19, 4)
+  paidAt         DateTime
+  method         PaymentMethod
+  reference      String?
+  internalNote   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoice        Invoice       @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, invoiceId, paidAt])
+  @@index([organizationId, paidAt])
+}
+
+model InvoiceRelation {
+  id              String              @id @default(uuid()) @db.Uuid
+  organizationId  String              @db.Uuid
+  sourceInvoiceId String              @db.Uuid
+  targetInvoiceId String              @db.Uuid
+  relationType    InvoiceRelationType
+  reason          String
+  createdAt       DateTime            @default(now())
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  sourceInvoice   Invoice             @relation("InvoiceRelationSource", fields: [organizationId, sourceInvoiceId], references: [organizationId, id], onDelete: Restrict)
+  targetInvoice   Invoice             @relation("InvoiceRelationTarget", fields: [organizationId, targetInvoiceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, targetInvoiceId, relationType])
+  @@index([organizationId, sourceInvoiceId])
 }

@@ -25,11 +25,17 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 
 - Payments are separate records, not a boolean on the invoice.
 - Support multiple and partial payments. Record amount, payment date, and method; reference and internal note are optional.
+- Payment status is derived from recorded payments: zero paid is UNPAID; a positive total below grandTotal is PARTIALLY_PAID; a total equal to or above grandTotal is PAID.
+- Only ISSUED invoices may receive payments. Payment amount must be positive. Record payment and recalculate payment status atomically; never change grandTotal because of a payment.
+- Overpayments remain recorded and leave status PAID. Refund and credit treatment are not implemented; overpayments require later accounting handling.
 
 ## Reworked and replacement invoices
 
 - An issued invoice may be superseded by one or multiple replacement invoices.
 - Preserve links from the original invoice to its replacements and from replacements to the original, with the reason and audit history.
+- Superseding an ISSUED invoice records one or more REPLACED_BY relations and changes the source lifecycle to SUPERSEDED in one transaction. Replacement invoices remain drafts until separately issued.
+- A replacement invoice may be the target of REPLACED_BY for only one source invoice within an organization. One source may still have multiple replacement targets.
+- Preserve any payments on the superseded source. Do not reverse, move, or redistribute them automatically; a human must determine the accounting treatment.
 - For example, one LKR 150,000 invoice may be replaced by three LKR 50,000 invoices. The relationship does not itself decide accounting treatment; follow an explicitly approved process.
 
 ## Recurring invoices
