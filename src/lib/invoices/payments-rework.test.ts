@@ -1,4 +1,4 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -363,6 +363,76 @@ describe("supersedeInvoice (PostgreSQL integration)", () => {
   });
 });
 
+describe("InvoiceTemplateVersion immutability (PostgreSQL integration)", () => {
+  it("allows creation and a new version while rejecting updates and deletion", async () => {
+    const rollbackMarker = "rollback template immutability fixture";
+    try {
+      await prisma.$transaction(async (tx) => {
+        const organizationId = randomUUID();
+        const organization = await tx.organization.create({
+          data: { id: organizationId, name: "Template Test", slug: `template-${organizationId}` },
+        });
+        const template = await tx.invoiceTemplate.create({
+          data: { organizationId: organization.id, name: "Hiiiive", key: "hiiiive" },
+        });
+        const version1 = await tx.invoiceTemplateVersion.create({
+          data: {
+            organizationId: organization.id,
+            templateId: template.id,
+            version: 1,
+            rendererKey: "hiiiive-default",
+            config: { logo: "hiiiive-mark", accentColor: "#126b45" },
+          },
+        });
+        const expectRejectedMutation = async (statement: () => Promise<unknown>) => {
+          await tx.$executeRaw`SAVEPOINT template_version_mutation`;
+          try {
+            await statement();
+            assert.fail("Expected immutable version mutation to fail");
+          } catch (error) {
+            assert.match(String(error), /immutable/);
+          } finally {
+            await tx.$executeRaw`ROLLBACK TO SAVEPOINT template_version_mutation`;
+            await tx.$executeRaw`RELEASE SAVEPOINT template_version_mutation`;
+          }
+        };
+
+        await expectRejectedMutation(() => tx.invoiceTemplateVersion.update({
+          where: { id: version1.id },
+          data: { config: { accentColor: "#000000" } },
+        }));
+        await expectRejectedMutation(() => tx.invoiceTemplateVersion.update({
+          where: { id: version1.id },
+          data: { rendererKey: "other-renderer" },
+        }));
+        await expectRejectedMutation(() => tx.invoiceTemplateVersion.update({
+          where: { id: version1.id },
+          data: { version: 9 },
+        }));
+        await expectRejectedMutation(() => tx.invoiceTemplateVersion.delete({ where: { id: version1.id } }));
+
+        const version2 = await tx.invoiceTemplateVersion.create({
+          data: {
+            organizationId: organization.id,
+            templateId: template.id,
+            version: 2,
+            rendererKey: "hiiiive-default",
+            config: { logo: "updated-hiiiive-mark", accentColor: "#123456" },
+          },
+        });
+        const unchangedVersion1 = await tx.invoiceTemplateVersion.findUniqueOrThrow({ where: { id: version1.id } });
+
+        assert.equal(version2.version, 2);
+        assert.equal(unchangedVersion1.version, 1);
+        assert.equal(unchangedVersion1.rendererKey, "hiiiive-default");
+        assert.deepEqual(unchangedVersion1.config, version1.config);
+        throw new Error(rollbackMarker);
+      });
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== rollbackMarker) throw error;
+    }
+  });
+});
 function paymentInput(amount: string) {
   return { amount, paidAt, method: "BANK_TRANSFER" as const };
 }
@@ -431,3 +501,5 @@ async function createIssuedInvoice(
 async function getInvoice(organizationId: string, invoiceId: string) {
   return prisma.invoice.findFirstOrThrow({ where: { organizationId, id: invoiceId } });
 }
+
+

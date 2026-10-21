@@ -21,6 +21,14 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - An issued invoice may be Paid, Partially Paid, Superseded/Reworked, Void, or Written Off where an authorized process permits it.
 - Preserve the original invoice and its audit history when it is superseded, voided, or written off. Record the reason and relevant actor.
 
+## Invoice templates
+
+- MVP1 uses the Hiiiive invoice template. Template records are organization-scoped; future SaaS may support multiple templates per organization.
+- Template versions are immutable after creation: updates and deletes are rejected by PostgreSQL. Any change to renderer, config, version, template, or organization requires creating a new version. An issued invoice must retain the exact template version used so its presentation can be reproduced historically.
+- Template version numbers are positive and unique within their template. Future server-side logic will validate version creation and assign/freeze the version when issuing an invoice.
+- Template configuration contains structured presentation and branding data, and references a trusted application renderer. It does not contain executable code or user-uploaded HTML/CSS.
+- Default-template selection may be supported, but future service logic must manage changes atomically; this rule does not assume exactly one default is enforced by the database.
+
 ## Payments
 
 - Payments are separate records, not a boolean on the invoice.
@@ -56,3 +64,4 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - Calculate financial totals using deterministic server-side code.
 - AI must never control totals, invoice numbering, approval, or sending.
 - Important invoice actions create immutable audit events recording actor, timestamp, action, and relevant reason/metadata.
+

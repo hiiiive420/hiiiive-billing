@@ -40,20 +40,22 @@ enum InvoiceRelationType {
 }
 
 model Organization {
-  id               String                   @id @default(uuid()) @db.Uuid
-  name             String
-  slug             String                   @unique
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
-  clients          Client[]
-  clientContacts   ClientContact[]
-  services         Service[]
-  memberships      OrganizationMembership[]
-  invoices         Invoice[]
-  invoiceItems     InvoiceItem[]
-  invoiceSequences InvoiceSequence[]
-  payments         Payment[]
-  invoiceRelations InvoiceRelation[]
+  id                      String                   @id @default(uuid()) @db.Uuid
+  name                    String
+  slug                    String                   @unique
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  clients                 Client[]
+  clientContacts          ClientContact[]
+  services                Service[]
+  memberships             OrganizationMembership[]
+  invoices                Invoice[]
+  invoiceItems            InvoiceItem[]
+  invoiceSequences        InvoiceSequence[]
+  payments                Payment[]
+  invoiceRelations        InvoiceRelation[]
+  invoiceTemplates        InvoiceTemplate[]
+  invoiceTemplateVersions InvoiceTemplateVersion[]
 }
 
 model User {
@@ -140,34 +142,36 @@ model Service {
 }
 
 model Invoice {
-  id                           String                 @id @default(uuid()) @db.Uuid
-  organizationId               String                 @db.Uuid
-  clientId                     String                 @db.Uuid
+  id                           String                  @id @default(uuid()) @db.Uuid
+  organizationId               String                  @db.Uuid
+  clientId                     String                  @db.Uuid
+  templateVersionId            String?                 @db.Uuid
   invoiceNumber                String?
-  lifecycleStatus              InvoiceLifecycleStatus @default(DRAFT)
-  paymentStatus                InvoicePaymentStatus   @default(UNPAID)
-  currencyCode                 String                 @default("LKR") @db.VarChar(3)
-  invoiceDate                  DateTime?              @db.Date
-  dueDate                      DateTime?              @db.Date
+  lifecycleStatus              InvoiceLifecycleStatus  @default(DRAFT)
+  paymentStatus                InvoicePaymentStatus    @default(UNPAID)
+  currencyCode                 String                  @default("LKR") @db.VarChar(3)
+  invoiceDate                  DateTime?               @db.Date
+  dueDate                      DateTime?               @db.Date
   issuedAt                     DateTime?
   clientNameSnapshot           String?
   clientBillingAddressSnapshot String?
   clientEmailSnapshot          String?
   clientPhoneSnapshot          String?
-  subtotal                     Decimal                @default(0) @db.Decimal(19, 4)
+  subtotal                     Decimal                 @default(0) @db.Decimal(19, 4)
   discountLabel                String?
-  discountAmount               Decimal                @default(0) @db.Decimal(19, 4)
-  grandTotal                   Decimal                @default(0) @db.Decimal(19, 4)
+  discountAmount               Decimal                 @default(0) @db.Decimal(19, 4)
+  grandTotal                   Decimal                 @default(0) @db.Decimal(19, 4)
   notes                        String?
   paymentTerms                 String?
-  createdAt                    DateTime               @default(now())
-  updatedAt                    DateTime               @updatedAt
-  organization                 Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  client                       Client                 @relation(fields: [organizationId, clientId], references: [organizationId, id], onDelete: Restrict)
+  createdAt                    DateTime                @default(now())
+  updatedAt                    DateTime                @updatedAt
+  organization                 Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  client                       Client                  @relation(fields: [organizationId, clientId], references: [organizationId, id], onDelete: Restrict)
   items                        InvoiceItem[]
   payments                     Payment[]
-  sourceRelations              InvoiceRelation[]      @relation("InvoiceRelationSource")
-  targetRelations              InvoiceRelation[]      @relation("InvoiceRelationTarget")
+  sourceRelations              InvoiceRelation[]       @relation("InvoiceRelationSource")
+  targetRelations              InvoiceRelation[]       @relation("InvoiceRelationTarget")
+  templateVersion              InvoiceTemplateVersion? @relation(fields: [organizationId, templateVersionId], references: [organizationId, id], onDelete: Restrict)
 
   // Enables tenant-safe composite foreign keys from invoice items.
   @@unique([organizationId, id])
@@ -177,6 +181,7 @@ model Invoice {
   @@index([organizationId, clientId])
   @@index([organizationId, invoiceDate])
   @@index([organizationId, dueDate])
+  @@index([organizationId, templateVersionId])
 }
 
 model InvoiceItem {
@@ -244,4 +249,40 @@ model InvoiceRelation {
 
   @@unique([organizationId, targetInvoiceId, relationType])
   @@index([organizationId, sourceInvoiceId])
+}
+
+model InvoiceTemplate {
+  id             String                   @id @default(uuid()) @db.Uuid
+  organizationId String                   @db.Uuid
+  name           String
+  key            String
+  active         Boolean                  @default(true)
+  isDefault      Boolean                  @default(false)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  versions       InvoiceTemplateVersion[]
+
+  // Supports tenant-safe references from template versions.
+  @@unique([organizationId, id])
+  @@unique([organizationId, key])
+  @@index([organizationId, isDefault])
+}
+
+model InvoiceTemplateVersion {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  templateId     String          @db.Uuid
+  version        Int
+  rendererKey    String
+  config         Json
+  createdAt      DateTime        @default(now())
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  template       InvoiceTemplate @relation(fields: [organizationId, templateId], references: [organizationId, id], onDelete: Restrict)
+  invoices       Invoice[]
+
+  // Supports tenant-safe references from invoices.
+  @@unique([organizationId, id])
+  @@unique([organizationId, templateId, version])
+  @@index([organizationId, templateId])
 }

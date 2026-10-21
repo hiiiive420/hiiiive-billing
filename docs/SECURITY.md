@@ -29,6 +29,12 @@ Authentication is not implemented. Future authentication may map an externally a
 - Issued financial data must not be silently edited; preserve changes and important actions through authorized, auditable workflows.
 - AI output is non-authoritative and cannot determine totals, numbering, approval, or sending.
 
+## Invoice template security
+
+- Template configuration is structured JSON presentation/branding data only. `rendererKey` selects a trusted application renderer; do not execute code from template data.
+- PostgreSQL rejects UPDATE and DELETE on template versions; changes must create a new version, preserving historical configurations even when unreferenced.
+- MVP1 does not support arbitrary user HTML/CSS uploads. Future SaaS custom templates require a separate security design covering sanitization and isolation before any such feature is implemented.
+
 ## Secrets and delivery
 
 - Never expose secrets, credentials, or privileged service keys in client code or client-visible responses.
@@ -38,3 +44,4 @@ Authentication is not implemented. Future authentication may map an externally a
 ## Audit trail
 
 Record immutable audit events for important invoice actions, including actor, timestamp, action, and relevant reason or metadata. Restrict access to internal notes and operational details to authorized users.
+
