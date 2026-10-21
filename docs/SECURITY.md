@@ -19,6 +19,8 @@ Authentication is not implemented. Future authentication may map an externally a
 ## Financial integrity
 
 - Calculate totals and assign invoice numbers on the server only. Never reuse an assigned invoice number.
+- Treat persisted line totals and invoice totals as non-authoritative inputs until computed or verified by server logic. The invoice schema stores them as decimal values; browser-supplied totals must never be trusted.
+- Scope invoice, client, service, and invoice-item relations by organization. Composite foreign keys enforce tenant matching in the database.
 - Validate state transitions and approval authority on the server.
 - Issued financial data must not be silently edited; preserve changes and important actions through authorized, auditable workflows.
 - AI output is non-authoritative and cannot determine totals, numbering, approval, or sending.

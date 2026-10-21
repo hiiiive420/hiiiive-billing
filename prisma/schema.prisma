@@ -13,16 +13,33 @@ enum OrganizationRole {
   VIEWER
 }
 
+enum InvoiceLifecycleStatus {
+  DRAFT
+  ISSUED
+  SUPERSEDED
+  VOID
+  WRITTEN_OFF
+}
+
+enum InvoicePaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
 model Organization {
-  id             String                   @id @default(uuid()) @db.Uuid
-  name           String
-  slug           String                   @unique
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  clients        Client[]
-  clientContacts ClientContact[]
-  services       Service[]
-  memberships    OrganizationMembership[]
+  id               String                   @id @default(uuid()) @db.Uuid
+  name             String
+  slug             String                   @unique
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  clients          Client[]
+  clientContacts   ClientContact[]
+  services         Service[]
+  memberships      OrganizationMembership[]
+  invoices         Invoice[]
+  invoiceItems     InvoiceItem[]
+  invoiceSequences InvoiceSequence[]
 }
 
 model User {
@@ -65,6 +82,7 @@ model Client {
   updatedAt                           DateTime        @updatedAt
   organization                        Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   contacts                            ClientContact[]
+  invoices                            Invoice[]
 
   // Enables a contact foreign key that enforces matching tenant and client.
   @@unique([organizationId, id])
@@ -90,16 +108,89 @@ model ClientContact {
 }
 
 model Service {
-  id               String       @id @default(uuid()) @db.Uuid
-  organizationId   String       @db.Uuid
+  id               String        @id @default(uuid()) @db.Uuid
+  organizationId   String        @db.Uuid
   name             String
   description      String?
-  defaultUnitPrice Decimal?     @db.Decimal(19, 4)
-  currencyCode     String       @default("LKR") @db.VarChar(3)
-  active           Boolean      @default(true)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  defaultUnitPrice Decimal?      @db.Decimal(19, 4)
+  currencyCode     String        @default("LKR") @db.VarChar(3)
+  active           Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoiceItems     InvoiceItem[]
 
+  // Enables invoice item foreign keys that enforce matching tenant and service.
+  @@unique([organizationId, id])
   @@index([organizationId, name])
+}
+
+model Invoice {
+  id                           String                 @id @default(uuid()) @db.Uuid
+  organizationId               String                 @db.Uuid
+  clientId                     String                 @db.Uuid
+  invoiceNumber                String?
+  lifecycleStatus              InvoiceLifecycleStatus @default(DRAFT)
+  paymentStatus                InvoicePaymentStatus   @default(UNPAID)
+  currencyCode                 String                 @default("LKR") @db.VarChar(3)
+  invoiceDate                  DateTime?              @db.Date
+  dueDate                      DateTime?              @db.Date
+  issuedAt                     DateTime?
+  clientNameSnapshot           String?
+  clientBillingAddressSnapshot String?
+  clientEmailSnapshot          String?
+  clientPhoneSnapshot          String?
+  subtotal                     Decimal                @default(0) @db.Decimal(19, 4)
+  discountLabel                String?
+  discountAmount               Decimal                @default(0) @db.Decimal(19, 4)
+  grandTotal                   Decimal                @default(0) @db.Decimal(19, 4)
+  notes                        String?
+  paymentTerms                 String?
+  createdAt                    DateTime               @default(now())
+  updatedAt                    DateTime               @updatedAt
+  organization                 Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  client                       Client                 @relation(fields: [organizationId, clientId], references: [organizationId, id], onDelete: Restrict)
+  items                        InvoiceItem[]
+
+  // Enables tenant-safe composite foreign keys from invoice items.
+  @@unique([organizationId, id])
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId, lifecycleStatus])
+  @@index([organizationId, paymentStatus])
+  @@index([organizationId, clientId])
+  @@index([organizationId, invoiceDate])
+  @@index([organizationId, dueDate])
+}
+
+model InvoiceItem {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  invoiceId      String       @db.Uuid
+  serviceId      String?      @db.Uuid
+  description    String
+  quantity       Decimal      @db.Decimal(19, 4)
+  unitPrice      Decimal      @db.Decimal(19, 4)
+  lineTotal      Decimal      @db.Decimal(19, 4)
+  position       Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoice        Invoice      @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Restrict)
+  service        Service?     @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, invoiceId, position])
+  @@index([organizationId, serviceId])
+}
+
+model InvoiceSequence {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  key            String       @default("DEFAULT")
+  prefix         String       @default("I")
+  nextValue      Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, key])
 }

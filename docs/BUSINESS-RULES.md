@@ -10,7 +10,13 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 ## Invoice lifecycle and numbering
 
 - Draft invoices are editable and have no final invoice number.
-- Assign a final invoice number only when an invoice is approved and issued. Invoice numbers are never reused, including after voiding or other later status changes.
+- Invoice lifecycle (`DRAFT`, `ISSUED`, `SUPERSEDED`, `VOID`, `WRITTEN_OFF`) is stored separately from payment state (`UNPAID`, `PARTIALLY_PAID`, `PAID`).
+- Hiiiive MVP invoice numbers use `I` + `YYYYMMDD` + the issued sequence, with no separators; for example, `I2026100922`.
+- `I` is the invoice prefix. `YYYYMMDD` comes from the `invoiceDate` locked at issuance. If `invoiceDate` is absent when issued, future issue logic uses the Asia/Colombo local date.
+- The numeric suffix is one organization-wide monotonically increasing sequence. It does not reset by day, month, or year.
+- Drafts consume no invoice number. Assign the number only when the invoice is approved and issued. Issued numbers are never reused, including for invoices later marked VOID, SUPERSEDED, or WRITTEN_OFF.
+- After issuance, `invoiceDate` and `invoiceNumber` are immutable.
+- Future SaaS may support configurable numbering formats; Hiiiive MVP uses the format above.
 - Issued financial data must not be silently edited.
 - An issued invoice may be Paid, Partially Paid, Superseded/Reworked, Void, or Written Off where an authorized process permits it.
 - Preserve the original invoice and its audit history when it is superseded, voided, or written off. Record the reason and relevant actor.
