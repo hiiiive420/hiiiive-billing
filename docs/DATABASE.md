@@ -77,7 +77,7 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 ### InvoiceSequence
 
 - Organization-scoped sequence row with key (`DEFAULT`), prefix (`I`), and `nextValue` (1) defaults; `(organizationId, key)` is unique.
-- This is storage for future atomic server-side number reservation. The Hiiiive MVP format and sequence rules are defined in `BUSINESS-RULES.md`; this model itself adds no formatting or allocation behavior, and drafts do not consume sequence values.
+- This stores the next available organization-wide sequence number. The server-only issuance service atomically reserves and increments it in the same transaction as issuance; drafts do not consume sequence values. The Hiiiive MVP format is defined in `BUSINESS-RULES.md`.
 
 ### Money representation
 

@@ -8,6 +8,8 @@ PostgreSQL access is configured with **Prisma ORM 7.10.1**, `@prisma/client`, th
 
 The production database strategy remains undecided until deployment. The server-only reusable client is exposed through `getPrismaClient()` in `src/lib/prisma.ts`. It is initialized lazily when called, checks for `DATABASE_URL`, and does not connect during module import. Store the URL only in the server environment or an ignored `.env` file; never expose it to client code. `.env.example` contains only an empty `DATABASE_URL=` placeholder.
 
+Invoice issuance is implemented in the server-only domain module `src/lib/invoices/issue-invoice.ts`. It loads and validates a draft within its organization, recalculates line and invoice totals, snapshots current client details, reserves the organization's next number atomically, and commits the invoice and sequence update in one PostgreSQL transaction. Future server actions or API handlers must supply organization scope from trusted authorization context.
+
 The application currently contains only a neutral `Hiiiive Billing` placeholder home page and root layout.
 
 ## Architectural guardrails

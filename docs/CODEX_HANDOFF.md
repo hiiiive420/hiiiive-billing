@@ -1,27 +1,28 @@
 ﻿# Codex Handoff
 
-- **Task ID:** INV-007A — Lock Hiiiive Invoice Number Convention
+- **Task ID:** INV-008A — Invoice Issuance Concurrency & Decimal Hardening
 - **Status:** Complete
 
 ## Summary
 
-Documented the confirmed Hiiiive MVP invoice number convention. No schema, migration, package, or application code changes were made.
+Added focused PostgreSQL integration coverage for concurrent issuance of the same draft and four-decimal financial rounding. No production logic or Prisma schema changes were required.
 
 ## Files changed
 
-- `docs/BUSINESS-RULES.md`
-- `docs/DATABASE.md`
+- `src/lib/invoices/issue-invoice.test.ts`
 - `docs/CODEX_HANDOFF.md`
 
-## Confirmed convention
+## New test results
 
-- Format: `I` + `YYYYMMDD` + issued sequence, with no separators (example: `I2026100922`).
-- The date is the invoice date locked at issuance, or the Asia/Colombo local date if no invoice date is present.
-- One organization-wide monotonically increasing sequence is used; it does not reset by day, month, or year.
-- Drafts consume no number. A number is assigned only on issuance and never reused, including after VOID, SUPERSEDED, or WRITTEN_OFF.
-- Issued `invoiceDate` and `invoiceNumber` are immutable.
-- Future SaaS may support configurable numbering formats; Hiiiive MVP uses this format.
+- Same-draft concurrency: two simultaneous `issueInvoice` calls result in exactly one success and one failure; the invoice is ISSUED with one invoice number and the DEFAULT sequence advances from 1 to 2 exactly once.
+- Decimal multiplication: quantity `1.3333` × unit price `10.5555` persists line total, subtotal, and grand total as Decimal `14.0736`.
+- Full PostgreSQL integration suite: 16 tests passed.
 
-## Scope
+## Production logic
 
-Documentation only. Invoice issuing, sequence allocation, and application enforcement of immutability remain future work.
+No changes were needed. Existing transactional sequence reservation, conditional DRAFT update, and Decimal rounding passed the added cases.
+
+## Requested checks
+
+`npm test` — 16/16 passed; `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run db:migrate:status` — all passed; migration status reports the database is up to date.
+
