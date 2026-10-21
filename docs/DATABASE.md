@@ -1,22 +1,37 @@
-﻿# Database
+# Database
 
 ## Local development and migration
 
 Local development uses the locally installed PostgreSQL server at `localhost:5432`. The database name is `hiiiive_billing`; connection details are kept in the ignored local `.env` file and are not documented here. Production database strategy remains undecided until deployment.
 
-The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It is applied to the local development database and creates only Organization, Client, ClientContact, and Service. `npm run db:migrate:status` reports that the database schema is up to date.
-
-Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords. No production database or deployment environment is configured.
+The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. The RBAC foundation migration is `20261020153112_add_user_rbac_foundation` (`add_user_rbac_foundation`). Both are applied to the local development database. Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
 
 ## Implemented Prisma models
-
-The PostgreSQL schema in `prisma/schema.prisma` currently implements only `Organization`, `Client`, `ClientContact`, and `Service`. These models are the schema foundation; server-side authorization and tenant scoping are still required in application code.
 
 ### Organization
 
 - UUID primary key, name, slug, `createdAt`, and `updatedAt`.
 - `slug` is unique.
-- Has clients, client contacts, and services.
+- Has clients, client contacts, services, and organization memberships.
+
+### User
+
+- Represents an authenticated human identity; UUID primary key, globally unique email, optional `displayName`, `active` defaulting true, and timestamps.
+- Email is the primary login identity. Future application logic must normalize email to lowercase before storing or looking it up. The database uniqueness constraint is global; normalization is an application responsibility.
+- No password or authentication-provider data is implemented.
+
+### OrganizationMembership
+
+- UUID primary key with required `organizationId` and `userId`, explicit `OrganizationRole`, `active` defaulting true, and timestamps.
+- Links one user to one organization. A unique constraint on `(organizationId, userId)` permits at most one membership per user per organization.
+- Organization and user deletions are restricted while memberships exist.
+- Indexed by `(organizationId, role)` and by `userId`; the unique `(organizationId, userId)` constraint also indexes organization membership lookup.
+
+### OrganizationRole and MVP1 use
+
+`OrganizationRole` has three values: `ADMIN`, `BILLING`, and `VIEWER`. A role must be assigned explicitly; there is no default. MVP1 intends one dedicated email/account to hold `ADMIN`. Krishna and working team members use `BILLING`. `VIEWER` is reserved for future read-only use.
+
+The schema does not enforce that there is only one ADMIN. Future application/service logic must prevent removal or demotion of the last active ADMIN in an organization.
 
 ### Client
 
@@ -31,7 +46,7 @@ The PostgreSQL schema in `prisma/schema.prisma` currently implements only `Organ
 
 - UUID primary key and required `organizationId` and `clientId` foreign keys.
 - Name, optional email and phone, `billingContact` and `primaryContact` defaults false, `active` defaults true, and timestamps.
-- Its composite foreign key `(organizationId, clientId)` references `(organizationId, id)` on Client. The separate `organizationId` foreign key explicitly scopes the contact to an organization and the composite relationship prevents linking to a client from another organization.
+- Its composite foreign key `(organizationId, clientId)` references `(organizationId, id)` on Client. The separate `organizationId` foreign key scopes the contact to an organization and the composite relationship prevents linking to a client from another organization.
 - Indexed by `(organizationId, clientId)`. Client and organization deletion are restricted while contacts exist.
 
 ### Service
@@ -61,6 +76,5 @@ The following entities and relationships remain design guidance only; they are n
 - **Invoice replacement link** — links an original invoice to one or more replacements with a reason.
 - **Email send attempt** — logs retryable delivery attempts for an approved and issued invoice.
 - **Audit event** — immutable record of important actions, actor, timestamp, action, and relevant reason/metadata.
-- **Actor/User** — identity for future authorized internal users.
 
 These future entities must follow the business and security requirements in `BUSINESS-RULES.md` and `SECURITY.md`. Their exact persistence and accounting treatment remain future implementation decisions.

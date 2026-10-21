@@ -1,14 +1,20 @@
-﻿# Security
+# Security
 
 ## Trust boundaries
 
 The browser is an untrusted client. Never accept browser-supplied totals, invoice statuses, final invoice numbers, or organization IDs as authoritative. Derive or validate sensitive values on the server using authorized records and deterministic business logic.
 
-## Authorization and tenant isolation
+## Authentication and user identities
 
-- Enforce authentication and authorization on the server for every protected operation.
-- Enforce organization scoping server-side for every organization-owned read and write. MVP1 has Hiiiive as its sole organization, but `organizationId` is required for future tenant isolation.
-- Do not rely on hidden UI controls or client-side checks as access control.
+Authentication is not implemented. Future authentication may map an externally authenticated email identity, such as Cloudflare Access, to `User.email`. Email identities must be normalized to lowercase before storage and before lookup. No passwords, sessions, OAuth tables, or authentication-provider integration are part of the current database foundation.
+
+## Authorization, RBAC, and tenant isolation
+
+- RBAC is organization-scoped through `OrganizationMembership`; a user's role applies within that organization.
+- UI visibility is not authorization. Hiding controls or pages does not protect data or operations.
+- Future application permissions must be enforced server-side on every protected operation, with organization scoping on every organization-owned read and write.
+- MVP1 intends one dedicated account with `ADMIN`; Krishna and working team members use `BILLING`; `VIEWER` is reserved for future read-only use.
+- The schema does not limit the number of ADMIN memberships. Future application/service logic must prevent removing or demoting the last active ADMIN in an organization.
 
 ## Financial integrity
 

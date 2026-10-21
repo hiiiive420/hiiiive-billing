@@ -7,15 +7,48 @@ datasource db {
   provider = "postgresql"
 }
 
+enum OrganizationRole {
+  ADMIN
+  BILLING
+  VIEWER
+}
+
 model Organization {
-  id             String          @id @default(uuid()) @db.Uuid
+  id             String                   @id @default(uuid()) @db.Uuid
   name           String
-  slug           String          @unique
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  slug           String                   @unique
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
   clients        Client[]
   clientContacts ClientContact[]
   services       Service[]
+  memberships    OrganizationMembership[]
+}
+
+model User {
+  id          String                   @id @default(uuid()) @db.Uuid
+  email       String                   @unique
+  displayName String?
+  active      Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  memberships OrganizationMembership[]
+}
+
+model OrganizationMembership {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  userId         String           @db.Uuid
+  role           OrganizationRole
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, role])
+  @@index([userId])
 }
 
 model Client {
