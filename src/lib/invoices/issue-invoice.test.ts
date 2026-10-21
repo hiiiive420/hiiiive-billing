@@ -42,6 +42,24 @@ describe("issueInvoice (local PostgreSQL integration)", () => {
     });
   });
 
+  it("normalizes a draft invoice currency to uppercase at issuance", async () => {
+    await withFixture(async ({ organizationId, invoiceId }) => {
+      await prisma.invoice.update({ where: { id: invoiceId }, data: { currencyCode: "usd" } });
+      const issued = await issueInvoice(organizationId, invoiceId);
+      assert.equal(issued.currencyCode, "USD");
+    });
+  });
+
+  it("rejects malformed invoice currency before reserving an invoice number", async () => {
+    await withFixture(async ({ organizationId, invoiceId }) => {
+      await prisma.invoice.update({ where: { id: invoiceId }, data: { currencyCode: "U$D" } });
+      await assert.rejects(issueInvoice(organizationId, invoiceId), InvoiceIssuanceError);
+      await assertNoSequence(organizationId);
+      const invoice = await prisma.invoice.findFirstOrThrow({ where: { id: invoiceId, organizationId } });
+      assert.equal(invoice.lifecycleStatus, "DRAFT");
+    });
+  });
+
   it("uses the Asia/Colombo calendar date when invoiceDate is absent", async () => {
     await withFixture(async ({ organizationId, invoiceId }) => {
       await prisma.invoice.update({ where: { id: invoiceId }, data: { invoiceDate: null } });

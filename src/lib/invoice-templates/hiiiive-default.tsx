@@ -6,6 +6,7 @@ import {
   parseHiiiiveTemplateConfig,
   type InvoiceView,
 } from "./config";
+import { normalizeInvoiceCurrencyCode } from "../invoices/currency";
 
 export type HiiiiveInvoiceProps = Readonly<{
   config: unknown;
@@ -20,6 +21,7 @@ export function HiiiiveInvoice({ config: untrustedConfig, invoice }: HiiiiveInvo
     "--invoice-body-font": "'DM Sans', '" + config.bodyFontName + "', Arial, sans-serif",
   } as CSSProperties;
   const discountIsZero = isZeroDecimal(invoice.discountAmount);
+  const currencyCode = normalizeInvoiceCurrencyCode(invoice.currencyCode);
 
   return (
     <article className="invoice-sheet" style={sheetStyle} aria-label={`Invoice ${invoice.invoiceNumber}`}>
@@ -69,7 +71,7 @@ export function HiiiiveInvoice({ config: untrustedConfig, invoice }: HiiiiveInvo
       <footer className="invoice-notes">
         {invoice.notes && <p>{invoice.notes}</p>}
         {config.footerNote && <p>{config.footerNote}</p>}
-        <p>All amounts are in {invoice.currencyCode}.</p>
+        <p>All amounts are in {currencyCode}.</p>
         <span className="company-display-name">{config.companyName}</span>
       </footer>
     </article>

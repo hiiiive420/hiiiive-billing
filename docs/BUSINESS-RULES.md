@@ -1,4 +1,4 @@
-﻿# Business Rules
+# Business Rules
 
 These rules are authoritative for MVP1. If a requirement conflicts with them or does not define a financial outcome, stop and raise the conflict for a decision; do not infer a new financial rule.
 
@@ -21,6 +21,13 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - An issued invoice may be Paid, Partially Paid, Superseded/Reworked, Void, or Written Off where an authorized process permits it.
 - Preserve the original invoice and its audit history when it is superseded, voided, or written off. Record the reason and relevant actor.
 
+## Invoice currency
+
+- `Invoice.currencyCode` is authoritative for the amounts on that invoice. Draft invoices default to `LKR` and may change currency while they remain DRAFT.
+- Normalize currency codes to uppercase and accept only exactly three ASCII letters. Reject malformed values; do not infer or convert another currency.
+- Issuance locks the normalized invoice currency. Treat currency as immutable after issuance; no exchange-rate or currency-conversion behavior is implemented.
+- `Service.currencyCode` describes the currency of `defaultUnitPrice`. Do not auto-fill or convert a service default price when it differs from the invoice currency; require an explicit invoice unit price in the invoice currency.
+- A future conventional invoice form will expose a Currency selector defaulting to LKR. Example choices include LKR, USD, CAD, GBP, EUR, and AUD.
 ## Invoice templates
 
 - MVP1 uses the Hiiiive invoice template. Template records are organization-scoped; future SaaS may support multiple templates per organization.

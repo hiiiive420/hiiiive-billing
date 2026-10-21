@@ -32,7 +32,6 @@ const sampleConfig = {
   headingFontName: "DejaVu Serif",
   bodyFontName: "DM Sans",
   primaryColor: "#255B83",
-  currencyDisplayLabel: "LKR",
 } as const;
 
 export default function InvoicePreviewPage() {

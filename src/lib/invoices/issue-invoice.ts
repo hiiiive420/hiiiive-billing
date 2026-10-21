@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Prisma, type Invoice } from "@/generated/prisma/client";
 import { getPrismaClient } from "../prisma";
+import { normalizeInvoiceCurrencyCode } from "./currency";
 
 const SEQUENCE_KEY = "DEFAULT";
 const INVOICE_TIME_ZONE = "Asia/Colombo";
@@ -38,6 +39,12 @@ export async function issueInvoice(
     }
     if (invoice.invoiceNumber !== null) {
       throw new InvoiceIssuanceError("A draft invoice must not already have a number.");
+    }
+    let currencyCode: string;
+    try {
+      currencyCode = normalizeInvoiceCurrencyCode(invoice.currencyCode);
+    } catch {
+      throw new InvoiceIssuanceError("Invoice currency code must contain exactly three ASCII letters.");
     }
     if (invoice.items.length === 0) {
       throw new InvoiceIssuanceError("An invoice must contain at least one item.");
@@ -121,6 +128,7 @@ export async function issueInvoice(
         invoiceDate,
         issuedAt,
         lifecycleStatus: "ISSUED",
+        currencyCode,
         subtotal,
         discountAmount,
         grandTotal,

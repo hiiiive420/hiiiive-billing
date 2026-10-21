@@ -6,7 +6,6 @@ export type HiiiiveTemplateConfig = Readonly<{
   headingFontName: string;
   bodyFontName: string;
   primaryColor: string;
-  currencyDisplayLabel: string;
   footerNote?: string;
 }>;
 
@@ -60,7 +59,6 @@ export function isHiiiiveTemplateConfig(value: unknown): value is HiiiiveTemplat
     && /^[A-Za-z0-9 ,-]{1,60}$/.test(config.bodyFontName)
     && typeof config.primaryColor === "string"
     && /^#[0-9A-Fa-f]{6}$/.test(config.primaryColor)
-    && nonEmptyString(config.currencyDisplayLabel)
     && optionalString(config.footerNote);
 }
 
@@ -75,7 +73,7 @@ export function formatAmount(value: string): string {
   if (!match) throw new TypeError("Amount must be a decimal string.");
   const [, sign, integerDigits, fractionDigits = ""] = match;
   const scaled = BigInt(integerDigits) * BigInt(100) + BigInt((fractionDigits + "000").slice(0, 2));
-  const shouldRoundUp = Number(fractionDigits[2] ?? "0") >= 5;
+  const shouldRoundUp = (fractionDigits[2] ?? "0") >= "5";
   const rounded = shouldRoundUp ? scaled + BigInt(1) : scaled;
   const whole = (rounded / BigInt(100)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const cents = (rounded % BigInt(100)).toString().padStart(2, "0");
@@ -83,9 +81,6 @@ export function formatAmount(value: string): string {
   return `${displayedSign}${whole}.${cents}`;
 }
 
-export function formatCurrencyAmount(value: string, currencyLabel: string): string {
-  return `${currencyLabel} ${formatAmount(value)}`;
-}
 export function formatInvoiceDate(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
   if (!match) throw new TypeError("Invoice date must begin with an ISO calendar date.");

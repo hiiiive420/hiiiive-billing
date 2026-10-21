@@ -1,4 +1,4 @@
-﻿# Database
+# Database
 
 ## Local development and migration
 
@@ -53,6 +53,7 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 
 - UUID primary key and required `organizationId` foreign key.
 - Name, optional description, optional `defaultUnitPrice`, `currencyCode` defaulting to `LKR`, `active` defaulting to true, and timestamps.
+- `currencyCode` identifies the currency of `defaultUnitPrice`; a service default in a different currency must not be auto-applied or converted for an invoice. Require an explicit invoice unit price.
 - Indexed by `(organizationId, name)`; service names are not globally unique.
 - Organization deletion is restricted while services exist.
 
@@ -62,7 +63,7 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 
 ### Invoice
 
-- UUID primary key, required organization and client IDs, optional `projectTitle`, lifecycle/payment statuses, currency (`LKR` by default), optional invoice/due dates and issue timestamp.
+- UUID primary key, required organization and client IDs, optional `projectTitle`, lifecycle/payment statuses, currency (`LKR` by default), optional invoice/due dates and issue timestamp. `Invoice.currencyCode` is authoritative: domain logic normalizes it to uppercase and accepts exactly three ASCII letters. Draft currency may change; issuance persists the normalized code, which must remain unchanged afterward.
 - Optional `templateVersionId` references a version through `(organizationId, templateVersionId)` to `(organizationId, id)`. Existing invoices may keep it null. Future issuance logic will set the version used for the historical invoice; issuance behavior is not changed by this schema task.
 - Optional client name, billing address, email, and phone snapshots preserve the details used by the invoice if the Client record later changes.
 - Subtotal, discount amount, and grand total use `Decimal(19,4)` with zero defaults. No floating point money fields are used.

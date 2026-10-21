@@ -3,13 +3,13 @@ import { describe, it } from "node:test";
 import { isValidElement, type ReactNode } from "react";
 import {
   formatAmount,
-  formatCurrencyAmount,
   isHiiiiveTemplateConfig,
   parseHiiiiveTemplateConfig,
   TemplateConfigError,
   type InvoiceView,
 } from "./config";
 import { resolveInvoiceRenderer, UnknownInvoiceRendererError } from "./registry";
+import { InvoiceCurrencyCodeError, normalizeInvoiceCurrencyCode } from "../invoices/currency";
 
 const validConfig = {
   companyName: "Hiiiive",
@@ -19,7 +19,6 @@ const validConfig = {
   headingFontName: "DejaVu Serif",
   bodyFontName: "DM Sans",
   primaryColor: "#255B83",
-  currencyDisplayLabel: "LKR",
 };
 
 const baseInvoice: InvoiceView = {
@@ -49,11 +48,18 @@ describe("Hiiiive invoice renderer", () => {
     assert.throws(() => parseHiiiiveTemplateConfig({ ...validConfig, companyName: 42 }), TemplateConfigError);
   });
 
+  it("normalizes currency codes to uppercase and rejects malformed values", () => {
+    assert.equal(normalizeInvoiceCurrencyCode("lkr"), "LKR");
+    assert.equal(normalizeInvoiceCurrencyCode("usd"), "USD");
+    for (const code of ["US", "USDX", "U$D", " USD", "USD ", "USD\n", "\uFF11\uFF12\uFF13"]) {
+      assert.throws(() => normalizeInvoiceCurrencyCode(code), InvoiceCurrencyCodeError);
+    }
+  });
+
   it("formats plain amounts with separators and two display decimals", () => {
     assert.equal(formatAmount("100"), "100.00");
     assert.equal(formatAmount("18500"), "18,500.00");
     assert.equal(formatAmount("13875.005"), "13,875.01");
-    assert.equal(formatCurrencyAmount("18500", "LKR"), "LKR 18,500.00");
   });
   it("prints item indices as 1., 2., and so on", () => {
     const Renderer = resolveInvoiceRenderer("hiiiive-default");
@@ -74,6 +80,15 @@ describe("Hiiiive invoice renderer", () => {
     const markup = textContent(Renderer({ config: validConfig, invoice: { ...baseInvoice, projectTitle: null } }));
     assert.doesNotMatch(markup, /Project\s*-/);
     assert.match(markup, /Date: October 19, 2026/);
+  });
+
+  it("renders a non-LKR invoice code in the final note without currency prefixes", () => {
+    const Renderer = resolveInvoiceRenderer("hiiiive-default");
+    const invoice = { ...baseInvoice, currencyCode: "usd" };
+    const markup = textContent(Renderer({ config: validConfig, invoice }));
+    assert.match(markup, /All amounts are in USD\./);
+    assert.match(markup, /18,500\.00/);
+    assert.doesNotMatch(markup, /(?:LKR|USD)\s+18,500\.00/);
   });
 
   it("hides a zero discount row", () => {

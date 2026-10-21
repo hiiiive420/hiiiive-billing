@@ -1,38 +1,39 @@
 ﻿# Codex Handoff
 
-- **Task ID:** INV-011A — Hiiiive Invoice Visual Parity & Mobile Preview
+- **Task ID:** INV-011B — Invoice Currency Rules
 - **Status:** Complete
 
 ## Summary
 
-Refined the existing Hiiiive invoice renderer and mobile browser preview without changing the invoice content structure or adding PDF support.
+Formalized invoice-level currency validation, issuance behavior, service-price currency rules, and renderer display. No Prisma schema, migration, exchange-rate, or conversion changes were made.
 
 ## Files changed
 
+- `src/lib/invoices/currency.ts`
+- `src/lib/invoices/issue-invoice.ts`
+- `src/lib/invoices/issue-invoice.test.ts`
 - `src/lib/invoice-templates/config.ts`
 - `src/lib/invoice-templates/hiiiive-default.tsx`
 - `src/lib/invoice-templates/renderer.test.tsx`
-- `src/app/dev/invoice-preview/invoice-preview-scale.tsx`
 - `src/app/dev/invoice-preview/page.tsx`
-- `src/app/globals.css`
+- `docs/BUSINESS-RULES.md`
+- `docs/DATABASE.md`
+- `docs/SECURITY.md`
 - `docs/CODEX_HANDOFF.md`
 
-## Visual and typography changes
+## Currency behavior
 
-- Darkened the invoice title and party headings; the title and Amount Payable row use DejaVu Serif. Project/date, party information, table headings/body, subtotal/discount, and notes use DM Sans with fallbacks.
-- Item indices display as `1.`, `2.`, etc. The project line is omitted when no title exists. Currency values are plain amounts with separators and two display decimals; the final currency note remains.
-- Discount rows remain hidden at zero. Totals use a narrower right-aligned block, Amount Payable retains Hiiiive blue with white text, and notes follow totals with natural spacing.
-- The supplied letterhead remains the full-page background; no waves, logo, or footer were recreated.
-
-## Mobile preview approach
-
-The invoice remains a fixed 210 × 297 mm A4 sheet with unchanged columns. A client-side `ResizeObserver` scales the complete sheet proportionally to the available preview width. Print CSS removes that scale, preserves A4 dimensions, and hides the preview banner. The development-only route behavior is unchanged.
+- `Invoice.currencyCode` is authoritative. Draft currency remains editable; issuance validates and stores the uppercase code, which must remain immutable after issuance.
+- Validation accepts exactly three ASCII letters and normalizes them to uppercase. Malformed values fail before sequence reservation.
+- A service default price is not auto-applied or converted when its currency differs from the invoice currency; an explicit invoice unit price is required.
+- Rendered financial values remain plain numbers, with the final note `All amounts are in {invoice.currencyCode}.` Currency is not template configuration.
+- Future invoice entry should offer a currency selector defaulting to LKR. AI input must ask for clarification when a symbol such as `$` is ambiguous.
 
 ## Tests and checks
 
-- `npm test` — 42 tests passed, including seven renderer/config tests for plain amount formatting, item numbering, absent project title, zero discount, renderer allowlisting/config validation, and financial-data immutability.
+- `npm test` — 46 tests passed, including uppercase normalization, malformed code rejection, non-LKR renderer note, financial data non-mutation, and PostgreSQL issuance normalization/rollback coverage.
 - `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run db:migrate:status` — passed; database schema is up to date.
 
 ## Blockers
 
-The Word invoice source was not present in the workspace, so exact spacing parity against that file could not be independently verified. The requested refinements were applied to the existing A4 layout.
+None.

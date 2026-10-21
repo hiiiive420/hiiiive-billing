@@ -1,4 +1,4 @@
-﻿# Security
+# Security
 
 ## Trust boundaries
 
@@ -29,6 +29,7 @@ Authentication is not implemented. Future authentication may map an externally a
 - Issued financial data must not be silently edited; preserve changes and important actions through authorized, auditable workflows.
 - AI output is non-authoritative and cannot determine totals, numbering, approval, or sending.
 
+- Use the invoice's currency code as the sole authority for its amounts. Validate and uppercase exactly three ASCII letters before issue; never convert currencies or trust an ambiguous AI-inferred symbol such as `$`. Request clarification when currency cannot be determined safely.
 ## Invoice template security
 
 - Template configuration is structured JSON presentation/branding data only. `rendererKey` selects a trusted application renderer; do not execute code from template data.
