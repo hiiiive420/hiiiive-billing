@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --conditions=react-server --import tsx --test src/lib/invoices/issue-invoice.test.ts src/lib/invoices/payments-rework.test.ts src/lib/invoice-templates/renderer.test.tsx",
+    "test": "node --conditions=react-server --import tsx --test src/lib/invoices/issue-invoice.test.ts src/lib/invoices/payments-rework.test.ts src/lib/invoice-templates/renderer.test.tsx && node --import tsx --test src/lib/invoice-templates/generate-pdf.test.ts",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
@@ -16,11 +16,13 @@
     "db:migrate:status": "prisma migrate status"
   },
   "dependencies": {
+    "@fontsource/dm-sans": "^5.3.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "dotenv": "^18.0.8",
     "next": "^16.4.2",
     "pg": "^8.23.1",
+    "puppeteer-core": "^25.15.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "server-only": "^0.0.1"

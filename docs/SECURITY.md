@@ -37,6 +37,16 @@ Authentication is not implemented. Future authentication may map an externally a
 - The renderer registry maps only trusted application renderer keys and rejects unknown keys. The development preview uses static sample data, performs no database reads, and returns 404 in production.
 - MVP1 does not support arbitrary user HTML/CSS uploads. Future SaaS custom templates require a separate security design covering sanitization and isolation before any such feature is implemented.
 
+## PDF generation
+
+- PDF creation runs server-side through the trusted renderer registry. Unknown renderer keys fail; template config is schema-validated and is never interpreted as executable content.
+- The PDF service renders the same approved renderer tree and stylesheet used by browser preview. Invoice text is HTML-escaped, the letterhead is loaded from a fixed application asset, and no browser-supplied HTML, CSS, renderer key, or filesystem path is accepted.
+- Headless Chromium JavaScript is disabled and all non-data requests are blocked, so rendering cannot fetch arbitrary URLs. The letterhead and four fixed application-controlled Fontsource DM Sans WOFF2 files are inlined as data URLs. The PDF service reads those fonts from fixed paths under `node_modules/@fontsource/dm-sans/files`; it accepts no font URL or filesystem path from request data.
+- The development sample PDF route uses static sample data only and returns 404 in production. Production callers must provide invoice data from trusted server-side records and authorization context.
+- `puppeteer-core` does not download or manage a browser. The executable path is trusted deployment configuration only; for example, set `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`. Production requires a configured executable, while development/test may resolve only fixed local Chrome/Edge paths. Never accept a binary path from request data.
+- Run the application and Chromium as an appropriate non-root OS user with Chromium's sandbox usable. Do not disable the sandbox by default. If deployment requires different Chromium flags, decide that explicitly during deployment.
+- DejaVu Serif retains its existing host font behavior. DM Sans is bundled through `@fontsource/dm-sans`; no font binaries are committed manually.
+
 ## Secrets and delivery
 
 - Never expose secrets, credentials, or privileged service keys in client code or client-visible responses.

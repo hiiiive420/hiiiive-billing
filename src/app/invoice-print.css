@@ -1,0 +1,170 @@
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.preview-shell {
+  min-height: 100vh;
+  padding: 24px 16px 48px;
+  background: #e9edf0;
+  color: #1f2a31;
+}
+
+.preview-banner {
+  width: min(210mm, calc(100vw - 32px));
+  margin: 0 auto 16px;
+  padding: 12px 16px;
+  border-left: 4px solid #255b83;
+  background: #fff;
+  font: 14px/1.4 Arial, sans-serif;
+  box-shadow: 0 2px 8px rgb(20 38 50 / 10%);
+}
+
+.invoice-preview-frame {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  overflow: hidden;
+}
+
+.invoice-preview-scale {
+  flex: 0 0 210mm;
+  width: 210mm;
+  height: 297mm;
+  transform-origin: top center;
+}
+
+.invoice-sheet {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 210mm;
+  height: 297mm;
+  margin: 0 auto;
+  padding: 54mm 19mm 24mm;
+  background: #fff url("/branding/hiiiive-invoice-letterhead.png") center / 100% 100% no-repeat;
+  color: #29343a;
+  font-family: var(--invoice-body-font, "DM Sans", Arial, sans-serif);
+  font-size: 10pt;
+  line-height: 1.45;
+}
+
+.invoice-heading h1 {
+  margin: 0 0 4px;
+  color: #202326;
+  font-family: var(--invoice-heading-font, "DejaVu Serif", Georgia, serif);
+  font-size: 20pt;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.invoice-heading p { margin: 1px 0; }
+.invoice-project { font-weight: 400; }
+.invoice-date { color: #56636b; }
+
+.invoice-parties {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 20mm;
+  margin: 8mm 0 9mm;
+  min-height: 26mm;
+}
+
+.invoice-parties h2 {
+  margin: 0 0 6px;
+  color: #202326;
+  font-family: var(--invoice-body-font, "DM Sans", Arial, sans-serif);
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.invoice-parties p { margin: 2px 0; white-space: pre-line; }
+.client-name { font-weight: 700; }
+.client-address { color: #58656c; }
+.payment-information { justify-self: end; width: 100%; }
+
+.invoice-lines {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: var(--invoice-body-font, "DM Sans", Arial, sans-serif);
+  font-size: 8.5pt;
+}
+.invoice-lines th {
+  padding: 8px 6px;
+  background: var(--invoice-accent, #255b83);
+  color: #fff;
+  font-family: var(--invoice-body-font, "DM Sans", Arial, sans-serif);
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-align: left;
+}
+.invoice-lines th:nth-child(1) { width: 9%; }
+.invoice-lines th:nth-child(2) { width: 34%; }
+.invoice-lines th:nth-child(3) { width: 11%; text-align: center; }
+.invoice-lines th:nth-child(4) { width: 23%; text-align: right; }
+.invoice-lines th:nth-child(5) { width: 23%; text-align: right; }
+.invoice-lines td { padding: 8px 6px; border-bottom: 1px solid #d9dfe2; overflow-wrap: anywhere; }
+.invoice-lines .item-index { color: #71808a; }
+.invoice-lines .quantity { text-align: center; }
+.invoice-lines .amount { text-align: right; white-space: nowrap; }
+
+.invoice-totals {
+  align-self: flex-end;
+  width: 63%;
+  margin-top: 7mm;
+  font-family: var(--invoice-body-font, "DM Sans", Arial, sans-serif);
+  font-size: 9pt;
+}
+.total-row {
+  display: grid;
+  grid-template-columns: 1fr minmax(34mm, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 5px 8px;
+  border-bottom: 1px solid #d9dfe2;
+}
+.total-row > span:last-child { text-align: right; white-space: nowrap; }
+.total-row.payable {
+  margin-top: 4px;
+  background: var(--invoice-accent, #255b83);
+  color: #fff;
+  font-family: var(--invoice-heading-font, "DejaVu Serif", Georgia, serif);
+  font-size: 10pt;
+  font-weight: 700;
+}
+
+.invoice-notes {
+  margin-top: 7mm;
+  padding-top: 0;
+  color: #515e66;
+  font-family: var(--invoice-body-font, "DM Sans", Arial, sans-serif);
+  font-size: 8pt;
+}
+.invoice-notes p { margin: 4px 0; }
+.company-display-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+  html, body { width: 210mm; min-height: 297mm; margin: 0 !important; background: #fff !important; }
+  body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .preview-shell { min-height: 0; padding: 0; background: #fff; }
+  .preview-banner { display: none !important; }
+  .invoice-preview-frame { height: 297mm !important; overflow: visible; }
+  .invoice-preview-scale { transform: none !important; }
+  .invoice-sheet {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}

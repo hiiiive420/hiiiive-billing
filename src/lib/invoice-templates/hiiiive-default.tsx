@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { createElement, type CSSProperties, type ReactNode } from "react";
 import {
   formatAmount,
   formatInvoiceDate,
@@ -13,7 +13,24 @@ export type HiiiiveInvoiceProps = Readonly<{
   invoice: InvoiceView;
 }>;
 
-export function HiiiiveInvoice({ config: untrustedConfig, invoice }: HiiiiveInvoiceProps) {
+type InvoiceNode = string | Readonly<{
+  tag: string;
+  className?: string;
+  ariaLabel?: string;
+  style?: CSSProperties;
+  key?: string;
+  children: readonly InvoiceNode[];
+}>;
+
+function element(
+  tag: string,
+  children: readonly InvoiceNode[],
+  attributes: Omit<Extract<InvoiceNode, { tag: string }>, "tag" | "children"> = {},
+): InvoiceNode {
+  return { tag, ...attributes, children };
+}
+
+function buildInvoiceTree({ config: untrustedConfig, invoice }: HiiiiveInvoiceProps): InvoiceNode {
   const config = parseHiiiiveTemplateConfig(untrustedConfig);
   const sheetStyle = {
     "--invoice-accent": config.primaryColor,
@@ -23,57 +40,80 @@ export function HiiiiveInvoice({ config: untrustedConfig, invoice }: HiiiiveInvo
   const discountIsZero = isZeroDecimal(invoice.discountAmount);
   const currencyCode = normalizeInvoiceCurrencyCode(invoice.currencyCode);
 
-  return (
-    <article className="invoice-sheet" style={sheetStyle} aria-label={`Invoice ${invoice.invoiceNumber}`}>
-      <header className="invoice-heading">
-        <h1>INVOICE-{invoice.invoiceNumber}</h1>
-        {invoice.projectTitle && <p className="invoice-project">Project - {invoice.projectTitle}</p>}
-        <p className="invoice-date">Date: {formatInvoiceDate(invoice.invoiceDate)}</p>
-      </header>
+  const children: InvoiceNode[] = [element("header", [
+    element("h1", [`INVOICE-${invoice.invoiceNumber}`]),
+    ...(invoice.projectTitle ? [element("p", [`Project - ${invoice.projectTitle}`], { className: "invoice-project" })] : []),
+    element("p", [`Date: ${formatInvoiceDate(invoice.invoiceDate)}`], { className: "invoice-date" }),
+  ], { className: "invoice-heading" }), element("section", [
+    element("div", [element("h2", ["TO:"]), element("p", [invoice.clientName], { className: "client-name" }),
+      ...(invoice.clientBillingAddress ? [element("p", [invoice.clientBillingAddress], { className: "client-address" })] : [])]),
+    element("div", [element("h2", ["PAYMENT INFORMATION:"]),
+      element("p", [`Bank: ${config.bankName ?? ""}`]),
+      element("p", [`Name: ${config.accountName ?? ""}`]),
+      element("p", [`Account: ${config.accountNumber ?? ""}`])], { className: "payment-information" }),
+  ], { className: "invoice-parties", ariaLabel: "Client and payment information" })];
 
-      <section className="invoice-parties" aria-label="Client and payment information">
-        <div>
-          <h2>TO:</h2>
-          <p className="client-name">{invoice.clientName}</p>
-          {invoice.clientBillingAddress && <p className="client-address">{invoice.clientBillingAddress}</p>}
-        </div>
-        <div className="payment-information">
-          <h2>PAYMENT INFORMATION:</h2>
-          <p>Bank: {config.bankName ?? ""}</p>
-          <p>Name: {config.accountName ?? ""}</p>
-          <p>Account: {config.accountNumber ?? ""}</p>
-        </div>
-      </section>
+  children.push(element("table", [
+    element("thead", [element("tr", ["ITEM", "SERVICES", "QTY", "UNIT PRICE", "AMOUNT"].map((label) => element("th", [label])))]),
+    element("tbody", invoice.items.map((item, index) => element("tr", [
+      element("td", [`${index + 1}.`], { className: "item-index" }), element("td", [item.description]),
+      element("td", [item.quantity], { className: "quantity" }),
+      element("td", [formatAmount(item.unitPrice)], { className: "amount" }),
+      element("td", [formatAmount(item.lineTotal)], { className: "amount" }),
+    ], { key: `${index}-${item.description}` }))),
+  ], { className: "invoice-lines" }));
 
-      <table className="invoice-lines">
-        <thead>
-          <tr><th>ITEM</th><th>SERVICES</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr>
-        </thead>
-        <tbody>
-          {invoice.items.map((item, index) => (
-            <tr key={`${index}-${item.description}`}>
-              <td className="item-index">{index + 1}.</td>
-              <td>{item.description}</td>
-              <td className="quantity">{item.quantity}</td>
-              <td className="amount">{formatAmount(item.unitPrice)}</td>
-              <td className="amount">{formatAmount(item.lineTotal)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+  children.push(element("section", [
+    element("div", [element("span", ["SUBTOTAL"]), element("span", [formatAmount(invoice.subtotal)])], { className: "total-row" }),
+    ...(!discountIsZero ? [element("div", [element("span", [invoice.discountLabel || "DISCOUNT"]),
+      element("span", [`-${formatAmount(invoice.discountAmount)}`])], { className: "total-row" })] : []),
+    element("div", [element("span", ["AMOUNT PAYABLE"]), element("span", [formatAmount(invoice.grandTotal)])], { className: "total-row payable" }),
+  ], { className: "invoice-totals", ariaLabel: "Invoice totals" }));
 
-      <section className="invoice-totals" aria-label="Invoice totals">
-        <div className="total-row"><span>SUBTOTAL</span><span>{formatAmount(invoice.subtotal)}</span></div>
-        {!discountIsZero && <div className="total-row"><span>{invoice.discountLabel || "DISCOUNT"}</span><span>-{formatAmount(invoice.discountAmount)}</span></div>}
-        <div className="total-row payable"><span>AMOUNT PAYABLE</span><span>{formatAmount(invoice.grandTotal)}</span></div>
-      </section>
+  children.push(element("footer", [
+    ...(invoice.notes ? [element("p", [invoice.notes])] : []),
+    ...(config.footerNote ? [element("p", [config.footerNote])] : []),
+    element("p", [`All amounts are in ${currencyCode}.`]),
+    element("span", [config.companyName], { className: "company-display-name" }),
+  ], { className: "invoice-notes" }));
 
-      <footer className="invoice-notes">
-        {invoice.notes && <p>{invoice.notes}</p>}
-        {config.footerNote && <p>{config.footerNote}</p>}
-        <p>All amounts are in {currencyCode}.</p>
-        <span className="company-display-name">{config.companyName}</span>
-      </footer>
-    </article>
-  );
+  return element("article", children, {
+    className: "invoice-sheet",
+    style: sheetStyle,
+    ariaLabel: `Invoice ${invoice.invoiceNumber}`,
+  });
+}
+
+function toReactNode(node: InvoiceNode, index = 0): ReactNode {
+  if (typeof node === "string") return node;
+  return createElement(node.tag, {
+    key: node.key ?? index,
+    ...(node.className ? { className: node.className } : {}),
+    ...(node.ariaLabel ? { "aria-label": node.ariaLabel } : {}),
+    ...(node.style ? { style: node.style } : {}),
+  }, ...node.children.map(toReactNode));
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#x27;",
+  })[character]!);
+}
+
+function serializeNode(node: InvoiceNode): string {
+  if (typeof node === "string") return escapeHtml(node);
+  const attributes = [
+    node.className ? `class="${escapeHtml(node.className)}"` : "",
+    node.ariaLabel ? `aria-label="${escapeHtml(node.ariaLabel)}"` : "",
+    node.style ? `style="${escapeHtml(Object.entries(node.style).map(([key, value]) => `${key}: ${String(value)}`).join(";"))}"` : "",
+  ].filter(Boolean).join(" ");
+  return `<${node.tag}${attributes ? ` ${attributes}` : ""}>${node.children.map(serializeNode).join("")}</${node.tag}>`;
+}
+
+export function renderHiiiiveInvoiceHtml(props: HiiiiveInvoiceProps): string {
+  return serializeNode(buildInvoiceTree(props));
+}
+
+export function HiiiiveInvoice(props: HiiiiveInvoiceProps) {
+  return toReactNode(buildInvoiceTree(props));
 }
