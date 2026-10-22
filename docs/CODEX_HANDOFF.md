@@ -1,50 +1,42 @@
 ﻿# Codex Handoff
 
-- **Task ID:** INV-012B — Deterministic DM Sans Loading for Preview & PDF
+- **Task ID:** INV-013 — Freeze Invoice Template Version at Issuance
 - **Status:** Complete
 
 ## Summary
 
-Bundled DM Sans through `@fontsource/dm-sans` for weights 400, 500, 600, and 700. Browser preview imports only those four weight styles. PDF HTML reads the corresponding fixed Latin WOFF2 package files and embeds them as trusted `@font-face` data URLs, so PDF typography does not depend on an OS-installed DM Sans or external network access. DejaVu Serif behavior remains unchanged. The existing trusted invoice renderer remains shared by preview and PDF.
+`issueInvoice()` resolves the organization's single active default template and latest immutable version before reserving a number. It validates the trusted renderer and structured configuration, then binds the selected version in the same transaction as invoice numbering and issuance. A partial unique index prevents multiple active defaults, and a database trigger requires a version binding on new issuance and prevents changing or clearing it afterward. Existing historical/manual invoices are not backfilled and may remain null.
 
 ## Files changed
 
-- `AGENTS.md` (Next.js 16 dev server generated its agent-rules block)
-- `package.json`
-- `package-lock.json`
-- `src/app/globals.css`
-- `src/app/invoice-print.css`
-- `src/app/dev/invoice-preview/page.tsx`
-- `src/app/dev/invoice-preview/pdf/route.ts`
-- `src/lib/invoice-templates/dev-sample.ts`
-- `src/lib/invoice-templates/hiiiive-default.tsx`
-- `src/lib/invoice-templates/registry.tsx`
-- `src/lib/invoice-templates/generate-pdf.ts`
-- `src/lib/invoice-templates/generate-pdf-core.tsx`
-- `src/lib/invoice-templates/browser-executable.ts`
-- `src/lib/invoice-templates/generate-pdf.test.ts`
+- `prisma/schema.prisma`
+- `prisma/migrations/20261022100000_freeze_invoice_template_at_issuance/migration.sql`
+- `src/lib/invoices/issue-invoice.ts`
+- `src/lib/invoices/issue-invoice.test.ts`
+- `src/lib/invoices/payments-rework.test.ts`
 - `docs/ARCHITECTURE.md`
+- `docs/DATABASE.md`
 - `docs/SECURITY.md`
-- `src/lib/invoice-templates/renderer.test.tsx`
+- `docs/BUSINESS-RULES.md`
 - `docs/CODEX_HANDOFF.md`
 
-## PDF generation and security
+## Resolution and immutability
 
-- `hiiiive-default` now builds one trusted invoice tree for both React preview and the PDF HTML serializer. The renderer registry rejects unknown keys; template configuration is validated and user text is HTML-escaped.
-- The PDF service embeds the shared `src/app/invoice-print.css` and fixed letterhead asset, disables browser JavaScript, blocks non-data network requests, and prints A4 portrait with zero margins and backgrounds. It rejects output that is not valid PDF data or is not one page.
-- `/dev/invoice-preview/pdf` downloads the shared static sample as `Invoice-I2026101923.pdf`; it has no database dependency and returns 404 in production.
-- `puppeteer-core` neither downloads nor manages Chromium. `PUPPETEER_EXECUTABLE_PATH` is trusted server configuration; production requires an absolute configured path, for example `/usr/bin/chromium`. Development/test resolve only fixed local Chrome/Edge locations when no path is configured.
-- Chromium's sandbox remains enabled; no `--no-sandbox` flags are used. Production must run the application/browser as an appropriate non-root OS user with Chromium's sandbox usable. Any alternate flags require an explicit deployment decision.
-- Production hosts still need DejaVu Serif for the existing heading typography. DM Sans is application-bundled. No font binaries were manually added to the repository.
+- Template lookup is scoped to `organizationId` and locks the active default row while issuing. The partial unique index allows at most one active default per organization.
+- The highest positive version is selected. Unsupported renderer keys, invalid config, absent active default, and absent/invalid versions fail before sequence reservation.
+- The existing tenant-safe composite FK prevents cross-organization version links. The issued invoice keeps its version through ISSUED, SUPERSEDED, VOID, and WRITTEN_OFF states.
+- Future issued-invoice PDF rendering must read renderer key/config through the invoice's saved `templateVersionId`; it must not follow a newer default.
 
 ## Tests and checks
 
-- `npm test` — passed, 54 tests total including the focused font HTML test and the existing PDF signature/A4/one-page assertions.
+- Migration SQL adds the active-default partial unique index and an invoice trigger for required-on-issuance and immutable-after-issuance bindings. It was applied to the development database.
+- Existing nullable bindings remain unchanged; no backfill is performed.
+- `npm test` — passed, 62 tests total (54 integration/unit tests plus eight PDF tests); all existing issuance concurrency and numbering checks pass.
 - `npm run typecheck` — passed.
-- `npm run db:migrate:status` — passed; database schema is up to date.
-- `npm run lint` — passed after removing one unused variable.
+- `npm run lint` — passed.
 - `npm run build` — passed; optimized production build completed.
+- `npm run db:migrate:status` — passed; all nine migrations are applied.
 
 ## Blockers
 
-Production runtime must configure an installed Chromium executable and usable sandbox under a non-root OS account. DejaVu Serif retains its prior host font requirement.
+None known.

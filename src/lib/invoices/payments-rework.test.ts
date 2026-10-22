@@ -15,6 +15,13 @@ const paidAt = new Date("2026-10-21T10:00:00.000Z");
 
 type Fixture = { organizationId: string; clientId: string };
 
+const issuanceTemplateConfig = {
+  companyName: "Hiiiive",
+  headingFontName: "DejaVu Serif",
+  bodyFontName: "DM Sans",
+  primaryColor: "#255B83",
+};
+
 after(async () => {
   await prisma.$disconnect();
 });
@@ -110,7 +117,7 @@ describe("recordPayment (PostgreSQL integration)", () => {
         );
         assert.equal(await prisma.payment.count({ where: { organizationId: second.organizationId, invoiceId } }), 0);
         assert.equal((await getInvoice(second.organizationId, invoiceId)).paymentStatus, "UNPAID");
-      });
+      }, "secondary");
     });
   });
 
@@ -268,7 +275,7 @@ describe("supersedeInvoice (PostgreSQL integration)", () => {
         );
         assert.equal((await getInvoice(sourceOrg.organizationId, sourceInvoiceId)).lifecycleStatus, "ISSUED");
         assert.equal(await prisma.invoiceRelation.count({ where: { organizationId: sourceOrg.organizationId } }), 0);
-      });
+      }, "secondary");
     });
   });
 
@@ -437,29 +444,73 @@ function paymentInput(amount: string) {
   return { amount, paidAt, method: "BANK_TRANSFER" as const };
 }
 
-async function withOrganization(run: (fixture: Fixture) => Promise<void>): Promise<void> {
-  const organizationId = randomUUID();
-  let created = false;
+async function withOrganization(
+  run: (fixture: Fixture) => Promise<void>,
+  tenant = "primary",
+): Promise<void> {
+  const organizationId = await ensurePaymentOrganization(tenant);
+  const template = await ensurePaymentTemplate(organizationId);
+  await cleanupPaymentFixture(organizationId);
   try {
-    await prisma.organization.create({
-      data: { id: organizationId, name: "Payments Test", slug: `payments-${organizationId}` },
-    });
-    created = true;
+    await setPaymentDefaultTemplate(organizationId, template.id);
     const client = await prisma.client.create({
       data: { organizationId, name: "Payments Test Client" },
     });
     await run({ organizationId, clientId: client.id });
   } finally {
-    if (created) {
-      await prisma.invoiceRelation.deleteMany({ where: { organizationId } });
-      await prisma.payment.deleteMany({ where: { organizationId } });
-      await prisma.invoiceItem.deleteMany({ where: { organizationId } });
-      await prisma.invoice.deleteMany({ where: { organizationId } });
-      await prisma.invoiceSequence.deleteMany({ where: { organizationId } });
-      await prisma.client.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
-    }
+    await cleanupPaymentFixture(organizationId);
+    await setPaymentDefaultTemplate(organizationId, template.id);
   }
+}
+
+async function ensurePaymentOrganization(tenant: string): Promise<string> {
+  const slug = `payments-integration-${tenant}`;
+  const existing = await prisma.organization.findUnique({ where: { slug } });
+  if (existing) return existing.id;
+  const created = await prisma.organization.create({ data: { name: "Payments Integration", slug } });
+  return created.id;
+}
+
+async function ensurePaymentTemplate(organizationId: string) {
+  const template = await prisma.invoiceTemplate.upsert({
+    where: { organizationId_key: { organizationId, key: "hiiiive-default-test" } },
+    create: {
+      organizationId,
+      key: "hiiiive-default-test",
+      name: "Hiiiive Test",
+      active: true,
+    },
+    update: { active: true },
+  });
+  const existingVersion = await prisma.invoiceTemplateVersion.findUnique({
+    where: { organizationId_templateId_version: { organizationId, templateId: template.id, version: 1 } },
+  });
+  if (!existingVersion) {
+    await prisma.invoiceTemplateVersion.create({
+      data: {
+        organizationId,
+        templateId: template.id,
+        version: 1,
+        rendererKey: "hiiiive-default",
+        config: issuanceTemplateConfig,
+      },
+    });
+  }
+  return template;
+}
+
+async function setPaymentDefaultTemplate(organizationId: string, templateId: string): Promise<void> {
+  await prisma.invoiceTemplate.updateMany({ where: { organizationId }, data: { isDefault: false } });
+  await prisma.invoiceTemplate.update({ where: { id: templateId }, data: { active: true, isDefault: true } });
+}
+
+async function cleanupPaymentFixture(organizationId: string): Promise<void> {
+  await prisma.invoiceRelation.deleteMany({ where: { organizationId } });
+  await prisma.payment.deleteMany({ where: { organizationId } });
+  await prisma.invoiceItem.deleteMany({ where: { organizationId } });
+  await prisma.invoice.deleteMany({ where: { organizationId } });
+  await prisma.invoiceSequence.deleteMany({ where: { organizationId } });
+  await prisma.client.deleteMany({ where: { organizationId } });
 }
 
 async function createDraftInvoice(

@@ -34,6 +34,9 @@ Authentication is not implemented. Future authentication may map an externally a
 
 - Template configuration is structured JSON presentation/branding data only. `rendererKey` selects a trusted application renderer; do not execute code from template data.
 - PostgreSQL rejects UPDATE and DELETE on template versions; changes must create a new version, preserving historical configurations even when unreferenced.
+- Issuance selects the active default template only within the supplied organization and validates its trusted renderer/config before reserving a number. A partial unique index prevents ambiguous active defaults; a tenant-safe composite foreign key prevents cross-organization version bindings.
+- The invoice template version binding is written atomically with issuance. A database trigger requires a non-null binding for new DRAFT-to-ISSUED transitions and prevents changing or clearing it after issuance, including after supersession, voiding, or write-off. Existing historical/manual invoices may remain unbound.
+- Issued-invoice rendering must load the renderer key and config through the invoice's frozen `templateVersionId`; it must not select the current default template.
 - The renderer registry maps only trusted application renderer keys and rejects unknown keys. The development preview uses static sample data, performs no database reads, and returns 404 in production.
 - MVP1 does not support arbitrary user HTML/CSS uploads. Future SaaS custom templates require a separate security design covering sanitization and isolation before any such feature is implemented.
 

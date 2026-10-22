@@ -1,7 +1,6 @@
 import "dotenv/config";
 
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
 import { after, describe, it } from "node:test";
 import { Prisma } from "@/generated/prisma/client";
 import { getPrismaClient } from "../prisma";
@@ -14,6 +13,15 @@ type Fixture = {
   organizationId: string;
   clientId: string;
   invoiceId: string;
+  templateId: string;
+  templateVersionId: string;
+};
+
+const validTemplateConfig = {
+  companyName: "Hiiiive",
+  headingFontName: "DejaVu Serif",
+  bodyFontName: "DM Sans",
+  primaryColor: "#255B83",
 };
 
 after(async () => {
@@ -22,11 +30,12 @@ after(async () => {
 
 describe("issueInvoice (local PostgreSQL integration)", () => {
   it("issues a draft with recalculated totals, status, timestamp, and client snapshots", async () => {
-    await withFixture(async ({ organizationId, invoiceId }) => {
+    await withFixture(async ({ organizationId, invoiceId, templateVersionId }) => {
       const result = await issueInvoice(organizationId, invoiceId);
       const item = await prisma.invoiceItem.findFirstOrThrow({ where: { invoiceId } });
 
       assert.equal(result.lifecycleStatus, "ISSUED");
+      assert.equal(result.templateVersionId, templateVersionId);
       assert.equal(result.paymentStatus, "UNPAID");
       assert.equal(result.invoiceNumber, "I202610091");
       assert.equal(result.issuedAt instanceof Date, true);
@@ -39,6 +48,111 @@ describe("issueInvoice (local PostgreSQL integration)", () => {
       assert.equal(result.clientBillingAddressSnapshot, "10 Test Road");
       assert.equal(result.clientEmailSnapshot, "client@example.test");
       assert.equal(result.clientPhoneSnapshot, "+94112223344");
+    });
+  });
+
+  it("binds the latest version of the active default template at issuance", async () => {
+    await withFixture(async ({ organizationId, invoiceId, templateId, templateVersionId }) => {
+      const currentlyLatest = await prisma.invoiceTemplateVersion.findUniqueOrThrow({
+        where: { id: templateVersionId },
+      });
+      const latest = await ensureTemplateVersion(
+        organizationId, templateId, currentlyLatest.version + 1, validTemplateConfig,
+      );
+      const result = await issueInvoice(organizationId, invoiceId);
+      assert.equal(result.templateVersionId, latest.id);
+    });
+  });
+
+  it("rejects issuance without an active default and consumes no number", async () => {
+    await withFixture(async ({ organizationId, invoiceId, templateId }) => {
+      await prisma.invoiceTemplate.update({ where: { id: templateId }, data: { active: false } });
+      await assert.rejects(issueInvoice(organizationId, invoiceId), InvoiceIssuanceError);
+      await assertNoSequence(organizationId);
+    });
+  });
+
+  it("prevents more than one active default template per organization", async () => {
+    await withFixture(async ({ organizationId }) => {
+      await assert.rejects(prisma.invoiceTemplate.create({
+        data: {
+          organizationId,
+          key: "ambiguous-default",
+          name: "Ambiguous Default",
+          active: true,
+          isDefault: true,
+        },
+      }));
+    });
+  });
+
+  it("rejects an active default with no version and consumes no number", async () => {
+    await withFixture(async ({ organizationId, invoiceId }) => {
+      const emptyTemplate = await ensureTemplate(organizationId, "no-version", "No Version");
+      await setDefaultTemplate(organizationId, emptyTemplate.id);
+      await assert.rejects(issueInvoice(organizationId, invoiceId), InvoiceIssuanceError);
+      await assertNoSequence(organizationId);
+    });
+  });
+
+  it("rejects an unsupported renderer before consuming a number", async () => {
+    await withFixture(async ({ organizationId, invoiceId }) => {
+      const unsupported = await ensureTemplate(organizationId, "unsupported", "Unsupported");
+      await ensureTemplateVersion(organizationId, unsupported.id, 1, validTemplateConfig, "unknown-renderer");
+      await setDefaultTemplate(organizationId, unsupported.id);
+      await assert.rejects(issueInvoice(organizationId, invoiceId), InvoiceIssuanceError);
+      await assertNoSequence(organizationId);
+    });
+  });
+
+  it("rejects invalid template configuration before consuming a number", async () => {
+    await withFixture(async ({ organizationId, invoiceId }) => {
+      const invalid = await ensureTemplate(organizationId, "invalid-config", "Invalid Config");
+      await ensureTemplateVersion(organizationId, invalid.id, 1, { companyName: "" });
+      await setDefaultTemplate(organizationId, invalid.id);
+      await assert.rejects(issueInvoice(organizationId, invoiceId), InvoiceIssuanceError);
+      await assertNoSequence(organizationId);
+    });
+  });
+
+  it("rejects a cross-organization template version binding", async () => {
+    await withFixture(async (first) => {
+      await withFixture(async (second) => {
+        await assert.rejects(prisma.invoice.update({
+          where: { id: first.invoiceId },
+          data: { templateVersionId: second.templateVersionId },
+        }));
+        await assertNoSequence(first.organizationId);
+      }, "secondary");
+    });
+  });
+
+  it("keeps an issued template version unchanged in all post-issue states", async () => {
+    await withFixture(async ({ organizationId, invoiceId, templateId }) => {
+      const issued = await issueInvoice(organizationId, invoiceId);
+      const boundVersion = await prisma.invoiceTemplateVersion.findUniqueOrThrow({
+        where: { id: issued.templateVersionId! },
+      });
+      const replacementVersion = await ensureTemplateVersion(
+        organizationId, templateId, boundVersion.version + 1, validTemplateConfig,
+      );
+      assert.notEqual(issued.templateVersionId, replacementVersion.id);
+
+      for (const lifecycleStatus of ["ISSUED", "SUPERSEDED", "VOID", "WRITTEN_OFF"] as const) {
+        if (lifecycleStatus !== "ISSUED") {
+          await prisma.invoice.update({ where: { id: invoiceId }, data: { lifecycleStatus } });
+        }
+        await assert.rejects(prisma.invoice.update({
+          where: { id: invoiceId },
+          data: { templateVersionId: replacementVersion.id },
+        }));
+        await assert.rejects(prisma.invoice.update({
+          where: { id: invoiceId },
+          data: { templateVersionId: null },
+        }));
+      }
+      const unchanged = await prisma.invoice.findFirstOrThrow({ where: { id: invoiceId, organizationId } });
+      assert.equal(unchanged.templateVersionId, issued.templateVersionId);
     });
   });
 
@@ -145,9 +259,9 @@ describe("issueInvoice (local PostgreSQL integration)", () => {
   });
 
   it("rejects reissuance unless the invoice remains a draft", async () => {
-    await withFixture(async ({ organizationId, invoiceId }) => {
+    await withFixture(async ({ organizationId, invoiceId, templateVersionId }) => {
       for (const lifecycleStatus of ["ISSUED", "VOID", "SUPERSEDED", "WRITTEN_OFF"] as const) {
-        await prisma.invoice.update({ where: { id: invoiceId }, data: { lifecycleStatus } });
+        await prisma.invoice.update({ where: { id: invoiceId }, data: { lifecycleStatus, templateVersionId } });
         await assert.rejects(issueInvoice(organizationId, invoiceId), InvoiceIssuanceError);
       }
       await assertNoSequence(organizationId);
@@ -166,7 +280,7 @@ describe("issueInvoice (local PostgreSQL integration)", () => {
         });
         assert.equal(untouched.lifecycleStatus, "DRAFT");
         await assertNoSequence(first.organizationId);
-      });
+      }, "secondary");
     });
   });
 
@@ -252,15 +366,17 @@ describe("issueInvoice (local PostgreSQL integration)", () => {
   });
 
   it("rolls back a reserved number when invoice persistence fails", async () => {
-    await withFixture(async ({ organizationId, clientId, invoiceId }) => {
+    await withFixture(async ({ organizationId, clientId, invoiceId, templateId }) => {
       await prisma.invoiceSequence.create({
         data: { organizationId, key: "DEFAULT", prefix: "I", nextValue: 77 },
       });
       const blockerId = await createInvoice(organizationId, clientId);
+      const templateVersionId = await getLatestTemplateVersionId(organizationId, templateId);
       await prisma.invoice.update({
         where: { id: blockerId },
         data: {
           lifecycleStatus: "ISSUED",
+          templateVersionId,
           invoiceNumber: "I2026100977",
           invoiceDate: new Date("2026-10-09T00:00:00.000Z"),
         },
@@ -284,18 +400,15 @@ describe("issueInvoice (local PostgreSQL integration)", () => {
   });
 });
 
-async function withFixture(run: (fixture: Fixture) => Promise<void>): Promise<void> {
-  const organizationId = randomUUID();
-  let created = false;
+async function withFixture(
+  run: (fixture: Fixture) => Promise<void>,
+  tenant = "primary",
+): Promise<void> {
+  const organizationId = await ensureIssuanceOrganization(tenant);
+  const template = await ensureDefaultTemplate(organizationId);
+  await cleanupIssuanceFixture(organizationId);
   try {
-    await prisma.organization.create({
-      data: {
-        id: organizationId,
-        name: "Invoice Issuance Test",
-        slug: `invoice-issuance-${organizationId}`,
-      },
-    });
-    created = true;
+    await setDefaultTemplate(organizationId, template.id);
     const client = await prisma.client.create({
       data: {
         organizationId,
@@ -306,16 +419,74 @@ async function withFixture(run: (fixture: Fixture) => Promise<void>): Promise<vo
       },
     });
     const invoiceId = await createInvoice(organizationId, client.id);
-    await run({ organizationId, clientId: client.id, invoiceId });
+    const latestVersion = await getLatestTemplateVersionId(organizationId, template.id);
+    await run({ organizationId, clientId: client.id, invoiceId, templateId: template.id, templateVersionId: latestVersion });
   } finally {
-    if (created) {
-      await prisma.invoiceItem.deleteMany({ where: { organizationId } });
-      await prisma.invoice.deleteMany({ where: { organizationId } });
-      await prisma.invoiceSequence.deleteMany({ where: { organizationId } });
-      await prisma.client.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
-    }
+    await cleanupIssuanceFixture(organizationId);
+    await setDefaultTemplate(organizationId, template.id);
   }
+}
+
+async function ensureIssuanceOrganization(tenant: string): Promise<string> {
+  const slug = `invoice-issuance-integration-${tenant}`;
+  const existing = await prisma.organization.findUnique({ where: { slug } });
+  if (existing) return existing.id;
+  const created = await prisma.organization.create({
+    data: { name: "Invoice Issuance Integration", slug },
+  });
+  return created.id;
+}
+
+async function ensureDefaultTemplate(organizationId: string) {
+  const template = await ensureTemplate(organizationId, "hiiiive-default-test", "Hiiiive Test");
+  await ensureTemplateVersion(organizationId, template.id, 1, validTemplateConfig);
+  return template;
+}
+
+async function ensureTemplate(organizationId: string, key: string, name: string) {
+  return prisma.invoiceTemplate.upsert({
+    where: { organizationId_key: { organizationId, key } },
+    create: { organizationId, key, name, active: true },
+    update: { active: true },
+  });
+}
+
+async function ensureTemplateVersion(
+  organizationId: string,
+  templateId: string,
+  version: number,
+  config: unknown,
+  rendererKey = "hiiiive-default",
+) {
+  const existing = await prisma.invoiceTemplateVersion.findUnique({
+    where: { organizationId_templateId_version: { organizationId, templateId, version } },
+  });
+  if (existing) return existing;
+  return prisma.invoiceTemplateVersion.create({
+    data: { organizationId, templateId, version, rendererKey, config: config as Prisma.InputJsonValue },
+  });
+}
+
+async function setDefaultTemplate(organizationId: string, templateId: string): Promise<void> {
+  await prisma.invoiceTemplate.updateMany({ where: { organizationId }, data: { isDefault: false } });
+  await prisma.invoiceTemplate.update({ where: { id: templateId }, data: { active: true, isDefault: true } });
+}
+
+async function getLatestTemplateVersionId(organizationId: string, templateId?: string): Promise<string> {
+  const version = await prisma.invoiceTemplateVersion.findFirstOrThrow({
+    where: { organizationId, ...(templateId ? { templateId } : {}) },
+    orderBy: { version: "desc" },
+  });
+  return version.id;
+}
+
+async function cleanupIssuanceFixture(organizationId: string): Promise<void> {
+  await prisma.invoiceRelation.deleteMany({ where: { organizationId } });
+  await prisma.payment.deleteMany({ where: { organizationId } });
+  await prisma.invoiceItem.deleteMany({ where: { organizationId } });
+  await prisma.invoice.deleteMany({ where: { organizationId } });
+  await prisma.invoiceSequence.deleteMany({ where: { organizationId } });
+  await prisma.client.deleteMany({ where: { organizationId } });
 }
 
 async function createInvoice(organizationId: string, clientId: string): Promise<string> {

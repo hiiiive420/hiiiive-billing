@@ -2,6 +2,8 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { Prisma, type Invoice } from "@/generated/prisma/client";
+import { parseHiiiiveTemplateConfig } from "../invoice-templates/config";
+import { resolveInvoiceRenderer } from "../invoice-templates/registry";
 import { getPrismaClient } from "../prisma";
 import { normalizeInvoiceCurrencyCode } from "./currency";
 
@@ -40,6 +42,8 @@ export async function issueInvoice(
     if (invoice.invoiceNumber !== null) {
       throw new InvoiceIssuanceError("A draft invoice must not already have a number.");
     }
+
+    const templateVersionId = await resolveIssuanceTemplateVersion(tx, organizationId);
     let currencyCode: string;
     try {
       currencyCode = normalizeInvoiceCurrencyCode(invoice.currencyCode);
@@ -128,6 +132,7 @@ export async function issueInvoice(
         invoiceDate,
         issuedAt,
         lifecycleStatus: "ISSUED",
+        templateVersionId,
         currencyCode,
         subtotal,
         discountAmount,
@@ -152,6 +157,40 @@ export async function issueInvoice(
 
     return issuedInvoice;
   });
+}
+
+async function resolveIssuanceTemplateVersion(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+): Promise<string> {
+  const defaults = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT "id"
+    FROM "InvoiceTemplate"
+    WHERE "organizationId" = ${organizationId}::uuid
+      AND "active" = TRUE
+      AND "isDefault" = TRUE
+    FOR SHARE
+  `;
+  if (defaults.length !== 1) {
+    throw new InvoiceIssuanceError("The organization must have one active default invoice template.");
+  }
+
+  const version = await tx.invoiceTemplateVersion.findFirst({
+    where: { organizationId, templateId: defaults[0]!.id },
+    orderBy: { version: "desc" },
+  });
+  if (!version || !Number.isInteger(version.version) || version.version < 1) {
+    throw new InvoiceIssuanceError("The active default invoice template has no valid version.");
+  }
+
+  try {
+    resolveInvoiceRenderer(version.rendererKey);
+    if (version.rendererKey === "hiiiive-default") parseHiiiiveTemplateConfig(version.config);
+  } catch {
+    throw new InvoiceIssuanceError("The active default invoice template version is invalid or unsupported.");
+  }
+
+  return version.id;
 }
 
 function colomboCalendarDate(timestamp: Date): Date {

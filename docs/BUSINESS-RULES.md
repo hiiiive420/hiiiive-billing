@@ -32,9 +32,9 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 
 - MVP1 uses the Hiiiive invoice template. Template records are organization-scoped; future SaaS may support multiple templates per organization.
 - Template versions are immutable after creation: updates and deletes are rejected by PostgreSQL. Any change to renderer, config, version, template, or organization requires creating a new version. An issued invoice must retain the exact template version used so its presentation can be reproduced historically.
-- Template version numbers are positive and unique within their template. Future server-side logic will validate version creation and assign/freeze the version when issuing an invoice.
+- Template version numbers are positive and unique within their template. Issuance resolves the organization's one active default template and freezes its latest version; that version is never changed on the issued invoice.
 - The Hiiiive MVP invoice presentation uses the trusted `hiiiive-default` renderer and structured presentation/branding config only. Template data cannot execute code or supply HTML/CSS. Financial values are rendered from persisted decimal/string values; rendering does not recalculate accounting values.
-- Default-template selection may be supported, but future service logic must manage changes atomically; this rule does not assume exactly one default is enforced by the database.
+- At most one active default template is permitted per organization. Inactive templates do not participate in default selection.
 
 ## Payments
 

@@ -4,7 +4,7 @@
 
 Local development uses the locally installed PostgreSQL server at `localhost:5432`. The database name is `hiiiive_billing`; connection details are kept in the ignored local `.env` file and are not documented here. Production database strategy remains undecided until deployment.
 
-The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), payments/reworked invoice relations (`add_payments_and_invoice_relations`), replacement lineage enforcement (`enforce_replacement_lineage`), invoice template versioning (`add_invoice_template_versioning`), template version immutability (`enforce_template_version_immutability`), and optional invoice project titles (`add_invoice_project_title`). Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
+The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), payments/reworked invoice relations (`add_payments_and_invoice_relations`), replacement lineage enforcement (`enforce_replacement_lineage`), invoice template versioning (`add_invoice_template_versioning`), template version immutability (`enforce_template_version_immutability`), optional invoice project titles (`add_invoice_project_title`), and template selection/freeze enforcement (`freeze_invoice_template_at_issuance`). Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
 
 ## Implemented Prisma models
 
@@ -64,7 +64,7 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 ### Invoice
 
 - UUID primary key, required organization and client IDs, optional `projectTitle`, lifecycle/payment statuses, currency (`LKR` by default), optional invoice/due dates and issue timestamp. `Invoice.currencyCode` is authoritative: domain logic normalizes it to uppercase and accepts exactly three ASCII letters. Draft currency may change; issuance persists the normalized code, which must remain unchanged afterward.
-- Optional `templateVersionId` references a version through `(organizationId, templateVersionId)` to `(organizationId, id)`. Existing invoices may keep it null. Future issuance logic will set the version used for the historical invoice; issuance behavior is not changed by this schema task.
+- Optional `templateVersionId` references a version through `(organizationId, templateVersionId)` to `(organizationId, id)`, preventing cross-organization references. New issuance sets the latest version of the active default template in the same transaction as numbering. A database trigger requires the binding on DRAFT-to-ISSUED and prevents changing or clearing it for ISSUED, SUPERSEDED, VOID, and WRITTEN_OFF invoices. Existing historical/manual invoices may remain null; there is no backfill.
 - Optional client name, billing address, email, and phone snapshots preserve the details used by the invoice if the Client record later changes.
 - Subtotal, discount amount, and grand total use `Decimal(19,4)` with zero defaults. No floating point money fields are used.
 - A compound unique key on `(organizationId, id)` supports tenant-safe child foreign keys. The client relation references `(organizationId, id)` on Client, enforcing same-organization ownership. Invoice number uniqueness is scoped to organization.
@@ -96,14 +96,14 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 ### InvoiceTemplate
 
 - Organization-scoped template identity with `name`, organization-unique `key`, `active`, `isDefault`, and timestamps. Names need not be unique.
-- `(organizationId, id)` supports the tenant-safe version relation. `(organizationId, key)` is unique. The schema permits default selection but does not enforce exactly one default; future service logic must manage default changes atomically.
+- `(organizationId, id)` supports the tenant-safe version relation. `(organizationId, key)` is unique. A partial unique index permits at most one active default per organization; inactive defaults do not affect issuance selection.
 - Deletion is restricted when versions exist.
 
 ### InvoiceTemplateVersion
 
 - Version record with organization/template IDs, version number, trusted `rendererKey`, structured `Json` config, and `createdAt` only. A PostgreSQL trigger rejects every UPDATE and DELETE, preserving history even when no invoice references the version.
 - `(organizationId, templateId, version)` is unique, and its composite FK enforces that the parent template belongs to the same organization. `(organizationId, id)` supports tenant-safe invoice references.
-- Version positivity is a future domain validation rule. The database does not store executable JavaScript or arbitrary renderer code in config; it is structured presentation/branding data.
+- The issuance service rejects non-positive version numbers and validates the renderer key and structured config before reserving an invoice number. The database does not store executable JavaScript or arbitrary renderer code in config; it is structured presentation/branding data.
 - Invoices can reference a version using a nullable tenant-safe composite FK. Restrict deletion protects referenced versions, and the database trigger prevents deletion of all versions, including unreferenced ones.
 
 ### Money representation

@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -267,6 +268,7 @@ model InvoiceTemplate {
   // Supports tenant-safe references from template versions.
   @@unique([organizationId, id])
   @@unique([organizationId, key])
+  @@unique([organizationId], map: "InvoiceTemplate_one_active_default_per_org", where: { active: true, isDefault: true })
   @@index([organizationId, isDefault])
 }
 
