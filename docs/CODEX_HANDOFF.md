@@ -1,38 +1,38 @@
 ﻿# Codex Handoff
 
-- **Task ID:** INV-014 — Database-Backed Issued Invoice Document & PDF Service
+- **Task ID:** INV-015 — Draft Invoice Creation & Editing Service
 - **Status:** Complete
 
 ## Summary
 
-Added a server-only document loader for persisted issued invoices and a PDF wrapper over the existing generator. The loader scopes access by organization, allows issued/closed states only, uses the exact frozen template version, and builds `InvoiceView` from persisted financial values, line items, and client snapshots. Historical invoices with a null template version fail explicitly and require separate historical handling.
+Added server-only draft invoice creation, header editing, and item replacement. The service validates active tenant-owned clients/services, calculates line and invoice totals with Decimal helpers shared with issuance, and keeps drafts unnumbered and unbound to template versions. Draft mutation and issuance acquire the invoice row lock, preventing issuance from reading stale data during concurrent edits.
 
 ## Files changed
 
-- `src/lib/invoices/issued-invoice-document.ts`
-- `src/lib/invoices/issued-invoice-document.test.ts`
-- `src/lib/invoices/generate-issued-invoice-pdf.ts`
+- `src/lib/invoices/draft-invoice.ts`
+- `src/lib/invoices/draft-invoice.test.ts`
+- `src/lib/invoices/invoice-financials.ts`
+- `src/lib/invoices/issue-invoice.ts`
 - `package.json`
 - `docs/ARCHITECTURE.md`
 - `docs/BUSINESS-RULES.md`
 - `docs/SECURITY.md`
 - `docs/CODEX_HANDOFF.md`
 
-## Document flow and historical fidelity
+## Draft behavior and integrity
 
-- The document lookup filters by `organizationId` and invoice ID and accepts ISSUED, SUPERSEDED, VOID, and WRITTEN_OFF states only.
-- It loads renderer/config through the invoice's immutable `templateVersionId`, validates both, and does not consult the current default template.
-- It reads persisted client snapshots and financial/item values. Prisma decimals are converted with exact decimal strings; items sort by position then ID.
-- `generateIssuedInvoicePdf()` delegates to the existing trusted PDF generator and formats `Invoice-{persisted invoiceNumber}.pdf`; it does not duplicate layout or mutate database state.
-- Null frozen template references fail clearly. No migration is required; historical rows remain unchanged.
+- `createDraftInvoice(organizationId, input)`, `updateDraftInvoice(organizationId, invoiceId, input)`, and `replaceDraftInvoiceItems(organizationId, invoiceId, items)` accept no caller-controlled lifecycle, numbering, snapshots, template binding, or totals.
+- Free-text items are supported. Service defaults require explicit opt-in and matching currency; explicit unit prices take precedence.
+- Line totals use four decimal places with `ROUND_HALF_UP`; subtotal and grand total use shared helpers also used by issuance. Issuance independently recalculates before numbering.
+- Item replacement and totals commit atomically. Failed create/edit operations reserve no invoice numbers. No database migration was required.
 
 ## Tests and checks
 
-- `npm test` — passed, 74 tests total (66 unit/integration tests and eight PDF tests).
+- `npm test` — passed, 77 unit/integration checks and eight PDF checks.
 - `npm run typecheck` — passed.
 - `npm run lint` — passed.
 - `npm run build` — passed; optimized production build completed.
-- `npm run db:migrate:status` — passed; all nine migrations are applied. No migration was needed for this task.
+- `npm run db:migrate:status` — passed; all nine migrations are applied.
 
 ## Blockers
 

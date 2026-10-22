@@ -15,6 +15,8 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - `I` is the invoice prefix. `YYYYMMDD` comes from the `invoiceDate` locked at issuance. If `invoiceDate` is absent when issued, future issue logic uses the Asia/Colombo local date.
 - The numeric suffix is one organization-wide monotonically increasing sequence. It does not reset by day, month, or year.
 - Drafts consume no invoice number. Assign the number only when the invoice is approved and issued. Issued numbers are never reused, including for invoices later marked VOID, SUPERSEDED, or WRITTEN_OFF.
+- Draft creation requires an active client in the same organization and at least one item. Drafts have no client snapshots or template-version binding; issuance captures client snapshots and resolves the template version.
+- Draft line items require a nonblank description, positive quantity, and nonnegative unit price. The server computes line totals, subtotal, discount validation, and grand total. A service default price is used only when explicitly requested and only when its currency matches the invoice; an explicit unit price always takes precedence.
 - After issuance, `invoiceDate` and `invoiceNumber` are immutable.
 - Future SaaS may support configurable numbering formats; Hiiiive MVP uses the format above.
 - Issued financial data must not be silently edited.

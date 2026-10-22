@@ -6,6 +6,7 @@ import { parseHiiiiveTemplateConfig } from "../invoice-templates/config";
 import { resolveInvoiceRenderer } from "../invoice-templates/registry";
 import { getPrismaClient } from "../prisma";
 import { normalizeInvoiceCurrencyCode } from "./currency";
+import { calculateInvoiceLineTotal, calculateInvoiceTotals } from "./invoice-financials";
 
 const SEQUENCE_KEY = "DEFAULT";
 const INVOICE_TIME_ZONE = "Asia/Colombo";
@@ -28,6 +29,15 @@ export async function issueInvoice(
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (tx) => {
+    // Serialize issuance with draft edits so issuance cannot read stale headers/items.
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "Invoice"
+      WHERE "organizationId" = ${organizationId}::uuid AND "id" = ${invoiceId}::uuid
+      FOR UPDATE
+    `;
+    if (locked.length !== 1) {
+      throw new InvoiceIssuanceError("Invoice was not found in this organization.");
+    }
     const invoice = await tx.invoice.findFirst({
       where: { id: invoiceId, organizationId },
       include: { items: true, client: true },
@@ -54,13 +64,11 @@ export async function issueInvoice(
       throw new InvoiceIssuanceError("An invoice must contain at least one item.");
     }
 
-    const zero = new Prisma.Decimal(0);
     const discountAmount = new Prisma.Decimal(invoice.discountAmount.toString());
     if (discountAmount.isNegative()) {
       throw new InvoiceIssuanceError("Discount amount cannot be negative.");
     }
 
-    let subtotal = zero;
     const lineTotals = invoice.items.map((item) => {
       const quantity = new Prisma.Decimal(item.quantity.toString());
       const unitPrice = new Prisma.Decimal(item.unitPrice.toString());
@@ -71,18 +79,14 @@ export async function issueInvoice(
         throw new InvoiceIssuanceError("Invoice item unit price cannot be negative.");
       }
 
-      const lineTotal = quantity
-        .mul(unitPrice)
-        .toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
-      subtotal = subtotal.plus(lineTotal);
+      const lineTotal = calculateInvoiceLineTotal(quantity, unitPrice);
       return { id: item.id, lineTotal };
     });
 
-    if (discountAmount.greaterThan(subtotal)) {
+    const totals = calculateInvoiceTotals(lineTotals.map(({ lineTotal }) => lineTotal), discountAmount);
+    if (discountAmount.greaterThan(totals.subtotal)) {
       throw new InvoiceIssuanceError("Discount amount cannot exceed subtotal.");
     }
-
-    const grandTotal = subtotal.minus(discountAmount);
     const issuedAt = new Date();
     const invoiceDate = invoice.invoiceDate ?? colomboCalendarDate(issuedAt);
 
@@ -134,9 +138,9 @@ export async function issueInvoice(
         lifecycleStatus: "ISSUED",
         templateVersionId,
         currencyCode,
-        subtotal,
+        subtotal: totals.subtotal,
         discountAmount,
-        grandTotal,
+        grandTotal: totals.grandTotal,
         clientNameSnapshot: invoice.client.name,
         clientBillingAddressSnapshot: invoice.client.billingAddress,
         clientEmailSnapshot: invoice.client.email,
