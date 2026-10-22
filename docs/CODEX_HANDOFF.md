@@ -1,38 +1,35 @@
 ﻿# Codex Handoff
 
-- **Task ID:** INV-015 — Draft Invoice Creation & Editing Service
+- **Task ID:** INV-016 — Invoice Form Read Model & Client/Service Queries
 - **Status:** Complete
 
 ## Summary
 
-Added server-only draft invoice creation, header editing, and item replacement. The service validates active tenant-owned clients/services, calculates line and invoice totals with Decimal helpers shared with issuance, and keeps drafts unnumbered and unbound to template versions. Draft mutation and issuance acquire the invoice row lock, preventing issuance from reading stale data during concurrent edits.
+Added server-only client and service searches plus a DRAFT-only invoice editing read model. Search results are tenant-scoped, active-only, minimal, deterministically ordered, and limited. Draft amounts remain exact decimal strings and item order is stable.
 
 ## Files changed
 
-- `src/lib/invoices/draft-invoice.ts`
-- `src/lib/invoices/draft-invoice.test.ts`
-- `src/lib/invoices/invoice-financials.ts`
-- `src/lib/invoices/issue-invoice.ts`
+- `src/lib/invoices/invoice-entry-queries.ts`
+- `src/lib/invoices/invoice-entry-queries.test.ts`
 - `package.json`
 - `docs/ARCHITECTURE.md`
-- `docs/BUSINESS-RULES.md`
 - `docs/SECURITY.md`
 - `docs/CODEX_HANDOFF.md`
 
-## Draft behavior and integrity
+## Read model behavior and integrity
 
-- `createDraftInvoice(organizationId, input)`, `updateDraftInvoice(organizationId, invoiceId, input)`, and `replaceDraftInvoiceItems(organizationId, invoiceId, items)` accept no caller-controlled lifecycle, numbering, snapshots, template binding, or totals.
-- Free-text items are supported. Service defaults require explicit opt-in and matching currency; explicit unit prices take precedence.
-- Line totals use four decimal places with `ROUND_HALF_UP`; subtotal and grand total use shared helpers also used by issuance. Issuance independently recalculates before numbering.
-- Item replacement and totals commit atomically. Failed create/edit operations reserve no invoice numbers. No database migration was required.
+- `searchInvoiceClients()` and `searchInvoiceServices()` return active records in the supplied organization only, with a default limit of 20 and hard maximum of 50.
+- Search text is trimmed, capped at 100 characters, and wildcard characters are escaped as literal text. Ordering is by name then ID.
+- `loadDraftInvoiceForEditing()` rejects cross-tenant and non-DRAFT invoices, returns ISO `YYYY-MM-DD` dates and exact Decimal strings, and orders items by position then ID.
+- Read queries only perform selects; no database migration was required.
 
 ## Tests and checks
 
-- `npm test` — passed, 77 unit/integration checks and eight PDF checks.
+- `npm test` — passed, 84 unit/integration checks and eight PDF checks.
 - `npm run typecheck` — passed.
 - `npm run lint` — passed.
 - `npm run build` — passed; optimized production build completed.
-- `npm run db:migrate:status` — passed; all nine migrations are applied.
+- `npm run db:migrate:status` — passed; all nine migrations are applied. No migration was needed.
 
 ## Blockers
 
