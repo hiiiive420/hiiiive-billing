@@ -35,6 +35,7 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - Template version numbers are positive and unique within their template. Issuance resolves the organization's one active default template and freezes its latest version; that version is never changed on the issued invoice.
 - The Hiiiive MVP invoice presentation uses the trusted `hiiiive-default` renderer and structured presentation/branding config only. Template data cannot execute code or supply HTML/CSS. Financial values are rendered from persisted decimal/string values; rendering does not recalculate accounting values.
 - At most one active default template is permitted per organization. Inactive templates do not participate in default selection.
+- Issued invoice documents use the frozen `templateVersionId`, immutable persisted totals/items, and client snapshots. Rendering must not read the current Client record, recompute invoice totals, or fall back to a current template. Historical/manual issued invoices with a null template version require explicit historical handling.
 
 ## Payments
 

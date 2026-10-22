@@ -1,41 +1,38 @@
 ﻿# Codex Handoff
 
-- **Task ID:** INV-013 — Freeze Invoice Template Version at Issuance
+- **Task ID:** INV-014 — Database-Backed Issued Invoice Document & PDF Service
 - **Status:** Complete
 
 ## Summary
 
-`issueInvoice()` resolves the organization's single active default template and latest immutable version before reserving a number. It validates the trusted renderer and structured configuration, then binds the selected version in the same transaction as invoice numbering and issuance. A partial unique index prevents multiple active defaults, and a database trigger requires a version binding on new issuance and prevents changing or clearing it afterward. Existing historical/manual invoices are not backfilled and may remain null.
+Added a server-only document loader for persisted issued invoices and a PDF wrapper over the existing generator. The loader scopes access by organization, allows issued/closed states only, uses the exact frozen template version, and builds `InvoiceView` from persisted financial values, line items, and client snapshots. Historical invoices with a null template version fail explicitly and require separate historical handling.
 
 ## Files changed
 
-- `prisma/schema.prisma`
-- `prisma/migrations/20261022100000_freeze_invoice_template_at_issuance/migration.sql`
-- `src/lib/invoices/issue-invoice.ts`
-- `src/lib/invoices/issue-invoice.test.ts`
-- `src/lib/invoices/payments-rework.test.ts`
+- `src/lib/invoices/issued-invoice-document.ts`
+- `src/lib/invoices/issued-invoice-document.test.ts`
+- `src/lib/invoices/generate-issued-invoice-pdf.ts`
+- `package.json`
 - `docs/ARCHITECTURE.md`
-- `docs/DATABASE.md`
-- `docs/SECURITY.md`
 - `docs/BUSINESS-RULES.md`
+- `docs/SECURITY.md`
 - `docs/CODEX_HANDOFF.md`
 
-## Resolution and immutability
+## Document flow and historical fidelity
 
-- Template lookup is scoped to `organizationId` and locks the active default row while issuing. The partial unique index allows at most one active default per organization.
-- The highest positive version is selected. Unsupported renderer keys, invalid config, absent active default, and absent/invalid versions fail before sequence reservation.
-- The existing tenant-safe composite FK prevents cross-organization version links. The issued invoice keeps its version through ISSUED, SUPERSEDED, VOID, and WRITTEN_OFF states.
-- Future issued-invoice PDF rendering must read renderer key/config through the invoice's saved `templateVersionId`; it must not follow a newer default.
+- The document lookup filters by `organizationId` and invoice ID and accepts ISSUED, SUPERSEDED, VOID, and WRITTEN_OFF states only.
+- It loads renderer/config through the invoice's immutable `templateVersionId`, validates both, and does not consult the current default template.
+- It reads persisted client snapshots and financial/item values. Prisma decimals are converted with exact decimal strings; items sort by position then ID.
+- `generateIssuedInvoicePdf()` delegates to the existing trusted PDF generator and formats `Invoice-{persisted invoiceNumber}.pdf`; it does not duplicate layout or mutate database state.
+- Null frozen template references fail clearly. No migration is required; historical rows remain unchanged.
 
 ## Tests and checks
 
-- Migration SQL adds the active-default partial unique index and an invoice trigger for required-on-issuance and immutable-after-issuance bindings. It was applied to the development database.
-- Existing nullable bindings remain unchanged; no backfill is performed.
-- `npm test` — passed, 62 tests total (54 integration/unit tests plus eight PDF tests); all existing issuance concurrency and numbering checks pass.
+- `npm test` — passed, 74 tests total (66 unit/integration tests and eight PDF tests).
 - `npm run typecheck` — passed.
 - `npm run lint` — passed.
 - `npm run build` — passed; optimized production build completed.
-- `npm run db:migrate:status` — passed; all nine migrations are applied.
+- `npm run db:migrate:status` — passed; all nine migrations are applied. No migration was needed for this task.
 
 ## Blockers
 

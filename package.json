@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --conditions=react-server --import tsx --test src/lib/invoices/issue-invoice.test.ts src/lib/invoices/payments-rework.test.ts src/lib/invoice-templates/renderer.test.tsx && node --import tsx --test src/lib/invoice-templates/generate-pdf.test.ts",
+    "test": "node --conditions=react-server --import tsx --test src/lib/invoices/issue-invoice.test.ts src/lib/invoices/issued-invoice-document.test.ts src/lib/invoices/payments-rework.test.ts src/lib/invoice-templates/renderer.test.tsx && node --import tsx --test src/lib/invoice-templates/generate-pdf.test.ts",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
