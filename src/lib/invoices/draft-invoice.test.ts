@@ -17,7 +17,7 @@ const prisma = getPrismaClient();
 const config = {
   companyName: "Hiiiive", headingFontName: "DejaVu Serif", bodyFontName: "DM Sans", primaryColor: "#255B83",
 };
-const line = (quantity = "1", unitPrice = "10", extras: Partial<DraftInvoiceItemInput> = {}): DraftInvoiceItemInput => ({
+const line = (quantity = "1", unitPrice = "10", extras: { serviceId?: string | null; description?: string; useServiceDefaultPrice?: boolean; position?: number } = {}): DraftInvoiceItemInput => ({
   description: "Service line", quantity, unitPrice, ...extras,
 });
 
@@ -27,7 +27,7 @@ describe("draft invoice service (PostgreSQL integration)", () => {
   it("creates a draft with defaults, no number, and server-derived amounts", async () => withFixture(async ({ organizationId, clientId }) => {
     const created = await createDraftInvoice(organizationId, {
       clientId,
-      items: [{ ...line("1.3333", "10.5555"), lineTotal: "999999" } as DraftInvoiceItemInput],
+      items: [{ ...line("1.3333", "10.5555"), lineTotal: "999999" } as unknown as DraftInvoiceItemInput],
     });
     const item = await prisma.invoiceItem.findFirstOrThrow({ where: { organizationId, invoiceId: created.id } });
     assert.equal(created.lifecycleStatus, "DRAFT");
@@ -39,6 +39,7 @@ describe("draft invoice service (PostgreSQL integration)", () => {
     assert.equal(created.subtotal.toString(), "14.0736");
     assert.equal(created.grandTotal.toString(), "14.0736");
     assert.equal(item.lineTotal.toString(), "14.0736");
+    assert.equal(item.billingMode, "QUANTITY");
     assert.equal(item.position, 0);
     await assertNoSequence(organizationId);
   }));
@@ -85,6 +86,65 @@ describe("draft invoice service (PostgreSQL integration)", () => {
     await assert.rejects(createDraftInvoice(organizationId, { clientId, items: [{ description: "Missing", quantity: "1", serviceId: service.id, useServiceDefaultPrice: true }] }), /differs from the invoice/);
     const explicit = await createDraftInvoice(organizationId, { clientId, items: [line("1", "3.25", { serviceId: service.id, useServiceDefaultPrice: true })] });
     assert.equal(explicit.subtotal.toString(), "3.25");
+  }));
+
+  it("stores flat fees with canonical quantity, amount, and recalculated total", async () => withFixture(async ({ organizationId, clientId }) => {
+    const invoice = await createDraftInvoice(organizationId, {
+      clientId,
+      items: [{ billingMode: "FLAT_FEE", description: "Social Media Management — October 2026", amount: "55000.1250" }],
+    });
+    const item = await prisma.invoiceItem.findFirstOrThrow({ where: { organizationId, invoiceId: invoice.id } });
+    assert.equal(item.billingMode, "FLAT_FEE");
+    assert.equal(item.quantity.toString(), "1");
+    assert.equal(item.unitPrice.toString(), "55000.125");
+    assert.equal(item.lineTotal.toString(), "55000.125");
+    assert.equal(invoice.subtotal.toString(), "55000.125");
+    await assertNoSequence(organizationId);
+  }));
+
+  it("validates flat amounts and uses service defaults only when explicitly requested", async () => withFixture(async ({ organizationId, clientId }) => {
+    const service = await prisma.service.create({ data: { organizationId, name: "Monthly management", defaultUnitPrice: new Prisma.Decimal("55000"), currencyCode: "LKR" } });
+    await assert.rejects(createDraftInvoice(organizationId, { clientId, items: [{ billingMode: "FLAT_FEE", description: "Missing amount", serviceId: service.id }] }), /Flat-fee amount is required/);
+    await assert.rejects(createDraftInvoice(organizationId, { clientId, items: [{ billingMode: "FLAT_FEE", description: "Negative amount", amount: "-1" }] }), /cannot be negative/);
+    const defaulted = await createDraftInvoice(organizationId, { clientId, items: [{ billingMode: "FLAT_FEE", description: "Defaulted", serviceId: service.id, useServiceDefaultPrice: true }] });
+    const defaultItem = await prisma.invoiceItem.findFirstOrThrow({ where: { organizationId, invoiceId: defaulted.id } });
+    assert.equal(defaultItem.unitPrice.toString(), "55000");
+    assert.equal(defaultItem.quantity.toString(), "1");
+    await assert.rejects(createDraftInvoice(organizationId, { clientId, currencyCode: "USD", items: [{ billingMode: "FLAT_FEE", description: "Wrong currency", serviceId: service.id, useServiceDefaultPrice: true }] }), /differs from the invoice/);
+    const explicit = await createDraftInvoice(organizationId, { clientId, items: [{ billingMode: "FLAT_FEE", description: "Explicit wins", serviceId: service.id, amount: "50000", useServiceDefaultPrice: true }] });
+    const explicitItem = await prisma.invoiceItem.findFirstOrThrow({ where: { organizationId, invoiceId: explicit.id } });
+    assert.equal(explicitItem.unitPrice.toString(), "50000");
+  }));
+
+  it("replaces flat-fee and quantity items while preserving their billing modes", async () => withFixture(async ({ organizationId, clientId }) => {
+    const invoice = await createDraftInvoice(organizationId, { clientId, items: [line()] });
+    await replaceDraftInvoiceItems(organizationId, invoice.id, [
+      { billingMode: "FLAT_FEE", description: "Monthly support", amount: "1200" },
+      { description: "Hourly consulting", quantity: "2", unitPrice: "300" },
+    ]);
+    const rows = await prisma.invoiceItem.findMany({ where: { organizationId, invoiceId: invoice.id }, orderBy: { position: "asc" } });
+    assert.deepEqual(rows.map(({ billingMode, quantity, unitPrice, lineTotal }) => [billingMode, quantity.toString(), unitPrice.toString(), lineTotal.toString()]), [
+      ["FLAT_FEE", "1", "1200", "1200"], ["QUANTITY", "2", "300", "600"],
+    ]);
+  }));
+
+  it("issues canonical flat fees", async () => withFixture(async ({ organizationId, clientId }) => {
+    const invoice = await createDraftInvoice(organizationId, { clientId, items: [{ billingMode: "FLAT_FEE", description: "Monthly support", amount: "1200" }] });
+    const issued = await issueInvoice(organizationId, invoice.id);
+    const issuedItem = await prisma.invoiceItem.findFirstOrThrow({ where: { organizationId, invoiceId: invoice.id } });
+    assert.equal(issued.lifecycleStatus, "ISSUED");
+    assert.equal(issued.subtotal.toString(), "1200");
+    assert.equal(issuedItem.lineTotal.toString(), "1200");
+  }));
+
+  it("rejects corrupted flat financial state before reserving a number", async () => withFixture(async ({ organizationId, clientId }) => {
+    const corrupted = await createDraftInvoice(organizationId, { clientId, items: [{ billingMode: "FLAT_FEE", description: "Corrupt me", amount: "800" }] });
+    await prisma.invoiceItem.updateMany({ where: { organizationId, invoiceId: corrupted.id }, data: { lineTotal: new Prisma.Decimal("801") } });
+    await assert.rejects(issueInvoice(organizationId, corrupted.id), /Flat-fee item total must equal its stored amount/);
+    const wrongQuantity = await createDraftInvoice(organizationId, { clientId, items: [{ billingMode: "FLAT_FEE", description: "Wrong quantity", amount: "900" }] });
+    await prisma.invoiceItem.updateMany({ where: { organizationId, invoiceId: wrongQuantity.id }, data: { quantity: new Prisma.Decimal("2") } });
+    await assert.rejects(issueInvoice(organizationId, wrongQuantity.id), /canonical quantity of 1/);
+    await assertNoSequence(organizationId);
   }));
 
   it("rejects invalid item amounts and discounts", async () => withFixture(async ({ organizationId, clientId }) => {

@@ -12,6 +12,8 @@ Invoice issuance is implemented in the server-only domain module `src/lib/invoic
 
 Draft invoice creation and editing live in the server-only `src/lib/invoices/draft-invoice.ts` service. It validates active organization-owned clients and services, calculates line and invoice totals with the same shared Decimal helpers used by issuance, and uses invoice row locks plus transactions for draft mutations. Drafts remain unnumbered and unbound to a template version. `issueInvoice()` independently recalculates totals and takes the same invoice row lock before reading, serializing issuance with concurrent draft edits.
 
+Invoice items store an explicit `billingMode`: `QUANTITY` calculates quantity × unit price, and `FLAT_FEE` stores the single amount as canonical quantity `1`, unit price, and server-calculated line total. Existing items default to `QUANTITY`. Issuance verifies flat-fee canonical quantity and amount/line-total consistency before reserving an invoice number. The frozen invoice document loader carries the stored mode to the trusted renderer; flat-fee customer documents hide the internal quantity and unit-price values.
+
 The server-only `src/lib/invoices/invoice-entry-queries.ts` module provides tenant-scoped active client/service searches and a DRAFT-only invoice editing read model. Searches return bounded, deterministic, minimal projections; the edit model uses ISO calendar dates and exact Decimal strings with items ordered by position and ID. These queries do not write database state.
 
 Payment recording and invoice supersession are implemented in `src/lib/invoices/record-payment.ts` and `src/lib/invoices/rework-invoice.ts`. Both are server-only transaction services with PostgreSQL integration coverage. Payment records and replacement relations preserve financial history; supersession does not transfer or reverse payments.
@@ -21,6 +23,8 @@ Invoice template identities and immutable versions are represented in the databa
 Server-side PDF generation is isolated in `src/lib/invoice-templates/generate-pdf.ts` and uses `puppeteer-core`, which does not download or manage Chromium. Production must install Chromium and configure `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` (or the installed executable's absolute path). Run the application as a non-root OS user with Chromium's sandbox usable. DM Sans weights 400, 500, 600, and 700 come from `@fontsource/dm-sans`: the browser preview loads the corresponding bundled weight styles, and PDF HTML embeds the matching fixed Latin WOFF2 files as data URLs. DejaVu Serif continues using the existing host font behavior.
 
 The application has a neutral `Hiiiive Billing` placeholder home page and root layout, plus the development-only invoice preview route.
+
+The conventional invoice entry UI lives at `/dev/invoices/new` and is development-only; it returns not-found in production. It calls the existing organization-scoped client/service searches and draft creation service through development-only Server Actions. An isolated development helper upserts the fixed `hiiiive` organization and deterministic sample client/service; it is unavailable in production. Organization IDs, lifecycle fields, and persisted totals are not read from form input. The form's decimal-string/BigInt calculations are display previews only. It creates new drafts; an edit route is deferred until header and item updates can be committed as one service transaction.
 
 ## Architectural guardrails
 

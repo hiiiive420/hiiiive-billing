@@ -4,7 +4,7 @@
 
 Local development uses the locally installed PostgreSQL server at `localhost:5432`. The database name is `hiiiive_billing`; connection details are kept in the ignored local `.env` file and are not documented here. Production database strategy remains undecided until deployment.
 
-The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), payments/reworked invoice relations (`add_payments_and_invoice_relations`), replacement lineage enforcement (`enforce_replacement_lineage`), invoice template versioning (`add_invoice_template_versioning`), template version immutability (`enforce_template_version_immutability`), optional invoice project titles (`add_invoice_project_title`), and template selection/freeze enforcement (`freeze_invoice_template_at_issuance`). Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
+The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), payments/reworked invoice relations (`add_payments_and_invoice_relations`), replacement lineage enforcement (`enforce_replacement_lineage`), invoice template versioning (`add_invoice_template_versioning`), template version immutability (`enforce_template_version_immutability`), optional invoice project titles (`add_invoice_project_title`), template selection/freeze enforcement (`freeze_invoice_template_at_issuance`), and `20261023060949_add_invoice_item_billing_mode`, which adds the `InvoiceItemBillingMode` enum and a non-null `billingMode` column defaulting to `QUANTITY`. This migration leaves existing financial values unchanged. Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
 
 ## Implemented Prisma models
 
@@ -72,7 +72,8 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 
 ### InvoiceItem
 
-- UUID primary key with required organization/invoice IDs, optional service ID, description, decimal quantity/unit price/line total (`Decimal(19,4)`), position, and timestamps.
+- UUID primary key with required organization/invoice IDs, optional service ID, description, `billingMode` (`QUANTITY` or `FLAT_FEE`, default `QUANTITY`), decimal quantity/unit price/line total (`Decimal(19,4)`), position, and timestamps.
+- `QUANTITY` stores entered quantity and unit price. `FLAT_FEE` stores quantity `1`, unit price equal to the flat amount, and line total equal to that amount. The explicit mode avoids inferring flat fees from quantity `1`; customer-facing invoices hide flat-fee quantity and unit-price fields.
 - Composite foreign keys `(organizationId, invoiceId)` and `(organizationId, serviceId)` enforce matching tenants. Invoice and Service have compound `(organizationId, id)` keys to support those relationships.
 - `lineTotal` is persisted as a snapshot; future server logic must calculate it authoritatively and never trust browser-supplied totals. Deletion is restricted.
 

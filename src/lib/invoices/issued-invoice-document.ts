@@ -47,7 +47,7 @@ export async function loadIssuedInvoiceDocument(
       templateVersion: { select: { rendererKey: true, config: true } },
       items: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
-        select: { description: true, quantity: true, unitPrice: true, lineTotal: true },
+        select: { description: true, billingMode: true, quantity: true, unitPrice: true, lineTotal: true },
       },
     },
   });
@@ -96,6 +96,7 @@ export async function loadIssuedInvoiceDocument(
       currencyCode: invoice.currencyCode,
       items: invoice.items.map((item) => ({
         description: item.description,
+        billingMode: item.billingMode,
         quantity: item.quantity.toString(),
         unitPrice: item.unitPrice.toString(),
         lineTotal: item.lineTotal.toString(),

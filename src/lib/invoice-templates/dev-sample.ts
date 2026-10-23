@@ -8,6 +8,7 @@ export const devSampleInvoice: InvoiceView = {
   clientBillingAddress: null,
   currencyCode: "LKR",
   items: [{
+    billingMode: "QUANTITY",
     description: "Price Pointer Artwork",
     quantity: "185",
     unitPrice: "100.00",

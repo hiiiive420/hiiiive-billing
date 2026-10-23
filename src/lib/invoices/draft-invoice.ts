@@ -12,15 +12,28 @@ export class DraftInvoiceError extends Error {
   }
 }
 
-export type DraftInvoiceItemInput = Readonly<{
+type DraftInvoiceItemBase = Readonly<{
   serviceId?: string | null;
   description: string;
-  quantity: string;
-  /** Omit only when explicitly requesting the service's default price. */
-  unitPrice?: string;
   useServiceDefaultPrice?: boolean;
   position?: number;
 }>;
+
+export type DraftInvoiceItemInput = DraftInvoiceItemBase & (
+  | Readonly<{
+      billingMode?: "QUANTITY";
+      quantity: string;
+      /** Omit only when explicitly requesting the service's default price. */
+      unitPrice?: string;
+      amount?: never;
+    }>
+  | Readonly<{
+      billingMode: "FLAT_FEE";
+      amount?: string;
+      quantity?: never;
+      unitPrice?: never;
+    }>
+);
 
 export type CreateDraftInvoiceInput = Readonly<{
   clientId: string;
@@ -48,6 +61,7 @@ export type UpdateDraftInvoiceInput = Readonly<{
 }>;
 
 type PreparedItem = {
+  billingMode: "QUANTITY" | "FLAT_FEE";
   serviceId: string | null;
   description: string;
   quantity: Prisma.Decimal;
@@ -113,15 +127,22 @@ export async function updateDraftInvoice(
     const items: PreparedItem[] = currentItems.map((item) => {
       const quantity = decimalFromDb(item.quantity);
       const unitPrice = decimalFromDb(item.unitPrice);
-      if (!quantity.greaterThan(0) || unitPrice.isNegative()) {
+      if (unitPrice.isNegative()) {
+        throw new DraftInvoiceError("Existing draft item has an invalid quantity or unit price.");
+      }
+      if (item.billingMode === "FLAT_FEE" && !quantity.equals(1)) {
+        throw new DraftInvoiceError("Existing flat-fee items must have the canonical quantity of 1.");
+      }
+      if (item.billingMode === "QUANTITY" && !quantity.greaterThan(0)) {
         throw new DraftInvoiceError("Existing draft item has an invalid quantity or unit price.");
       }
       return {
+        billingMode: item.billingMode,
         serviceId: item.serviceId,
         description: item.description,
         quantity,
         unitPrice,
-        lineTotal: calculateInvoiceLineTotal(quantity, unitPrice),
+        lineTotal: item.billingMode === "FLAT_FEE" ? unitPrice : calculateInvoiceLineTotal(quantity, unitPrice),
         position: item.position,
       };
     });
@@ -233,10 +254,19 @@ async function prepareItems(
     if (!input || typeof input.description !== "string" || input.description.trim().length === 0) {
       throw new DraftInvoiceError("Invoice item description is required.");
     }
-    const quantity = parseDecimal(input.quantity, "Item quantity");
-    if (!quantity.greaterThan(0)) throw new DraftInvoiceError("Item quantity must be positive.");
+    const billingMode = input.billingMode ?? "QUANTITY";
+    if (billingMode !== "QUANTITY" && billingMode !== "FLAT_FEE") {
+      throw new DraftInvoiceError("Invoice item billing mode is invalid.");
+    }
+    const quantity = billingMode === "FLAT_FEE"
+      ? new Prisma.Decimal(1)
+      : parseDecimal(input.billingMode === "FLAT_FEE" ? undefined : input.quantity, "Item quantity");
+    if (billingMode === "QUANTITY" && !quantity.greaterThan(0)) throw new DraftInvoiceError("Item quantity must be positive.");
     let serviceId = input.serviceId ?? null;
     let defaultPrice: Prisma.Decimal | null = null;
+    const explicitPrice = billingMode === "FLAT_FEE"
+      ? input.billingMode === "FLAT_FEE" ? input.amount : undefined
+      : input.billingMode === "FLAT_FEE" ? undefined : input.unitPrice;
     if (serviceId !== null) {
       const service = await tx.service.findFirst({
         where: { id: serviceId, organizationId, active: true },
@@ -244,7 +274,7 @@ async function prepareItems(
       });
       if (!service) throw new DraftInvoiceError("Service must be active and belong to this organization.");
       serviceId = service.id;
-      if (input.unitPrice === undefined && input.useServiceDefaultPrice === true) {
+      if (explicitPrice === undefined && input.useServiceDefaultPrice === true) {
         let serviceCurrency: string;
         try { serviceCurrency = normalizeInvoiceCurrencyCode(service.currencyCode); }
         catch { throw new DraftInvoiceError("Service currency code is invalid; provide an explicit unit price."); }
@@ -256,23 +286,25 @@ async function prepareItems(
         }
         defaultPrice = decimalFromDb(service.defaultUnitPrice);
       }
-    } else if (input.useServiceDefaultPrice === true) {
+    } else if (input.useServiceDefaultPrice === true && explicitPrice === undefined) {
       throw new DraftInvoiceError("A service is required to use its default price.");
     }
-    const unitPrice = input.unitPrice !== undefined
-      ? parseDecimal(input.unitPrice, "Unit price")
-      : defaultPrice ?? (() => { throw new DraftInvoiceError("Unit price is required unless the service default is explicitly requested."); })();
+    const priceLabel = billingMode === "FLAT_FEE" ? "Flat-fee amount" : "Unit price";
+    const unitPrice = explicitPrice !== undefined
+      ? parseDecimal(explicitPrice, priceLabel)
+      : defaultPrice ?? (() => { throw new DraftInvoiceError(`${priceLabel} is required unless the service default is explicitly requested.`); })();
     if (unitPrice.isNegative()) throw new DraftInvoiceError("Unit price cannot be negative.");
     const position = input.position ?? index;
     if (!Number.isSafeInteger(position) || position < 0 || position > 2_147_483_647) {
       throw new DraftInvoiceError("Item position must be a nonnegative 32-bit integer.");
     }
     prepared.push({
+      billingMode,
       serviceId,
       description: input.description.trim(),
       quantity,
       unitPrice,
-      lineTotal: calculateInvoiceLineTotal(quantity, unitPrice),
+      lineTotal: billingMode === "FLAT_FEE" ? unitPrice : calculateInvoiceLineTotal(quantity, unitPrice),
       position,
     });
   }

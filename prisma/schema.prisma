@@ -28,6 +28,11 @@ enum InvoicePaymentStatus {
   PAID
 }
 
+enum InvoiceItemBillingMode {
+  QUANTITY
+  FLAT_FEE
+}
+
 enum PaymentMethod {
   BANK_TRANSFER
   CASH
@@ -187,20 +192,21 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
-  invoiceId      String       @db.Uuid
-  serviceId      String?      @db.Uuid
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @db.Uuid
+  invoiceId      String                 @db.Uuid
+  serviceId      String?                @db.Uuid
   description    String
-  quantity       Decimal      @db.Decimal(19, 4)
-  unitPrice      Decimal      @db.Decimal(19, 4)
-  lineTotal      Decimal      @db.Decimal(19, 4)
+  billingMode    InvoiceItemBillingMode @default(QUANTITY)
+  quantity       Decimal                @db.Decimal(19, 4)
+  unitPrice      Decimal                @db.Decimal(19, 4)
+  lineTotal      Decimal                @db.Decimal(19, 4)
   position       Int
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  invoice        Invoice      @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Restrict)
-  service        Service?     @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoice        Invoice                @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Restrict)
+  service        Service?               @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict)
 
   @@index([organizationId, invoiceId, position])
   @@index([organizationId, serviceId])

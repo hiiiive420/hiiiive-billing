@@ -122,6 +122,8 @@ describe("invoice entry read queries (PostgreSQL integration)", () => {
     assert.equal(model.items[0]?.quantity, beforeItems[0]?.quantity.toString());
     assert.equal(model.items[0]?.unitPrice, beforeItems[0]?.unitPrice.toString());
     assert.equal(model.items[0]?.lineTotal, beforeItems[0]?.lineTotal.toString());
+    assert.equal(model.items[0]?.billingMode, "QUANTITY");
+    assert.equal(model.items[0]?.amount, null);
 
     const afterInvoice = await prisma.invoice.findFirstOrThrow({ where: { id: invoice.id, organizationId } });
     const afterItems = await prisma.invoiceItem.findMany({ where: { organizationId, invoiceId: invoice.id }, orderBy: { id: "asc" } });
@@ -130,6 +132,16 @@ describe("invoice entry read queries (PostgreSQL integration)", () => {
     assert.deepEqual(await prisma.invoiceSequence.findFirst({ where: { organizationId } }), beforeSequence);
     assert.equal(await prisma.invoiceTemplate.count({ where: { organizationId } }), beforeTemplateCount);
     assert.ok(templateId);
+  }));
+
+  it("returns flat-fee editor amounts without requiring quantity entry", async () => withFixture(async ({ organizationId, clientId }) => {
+    const invoice = await createDraftInvoice(organizationId, {
+      clientId,
+      items: [{ billingMode: "FLAT_FEE", description: "Monthly service", amount: "55000" }],
+    });
+    const model = await loadDraftInvoiceForEditing(organizationId, invoice.id);
+    assert.equal(model.items[0]?.billingMode, "FLAT_FEE");
+    assert.equal(model.items[0]?.amount, "55000");
   }));
 
   it("rejects cross-organization and issued invoices from the draft editor read model", async () => withFixture(async ({ organizationId, otherOrganizationId, clientId }) => {

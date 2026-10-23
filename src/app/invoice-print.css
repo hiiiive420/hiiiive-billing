@@ -110,6 +110,9 @@ body {
 .invoice-lines th:nth-child(3) { width: 11%; text-align: center; }
 .invoice-lines th:nth-child(4) { width: 23%; text-align: right; }
 .invoice-lines th:nth-child(5) { width: 23%; text-align: right; }
+.invoice-lines-flat th:nth-child(1) { width: 10%; }
+.invoice-lines-flat th:nth-child(2) { width: 55%; }
+.invoice-lines-flat th:nth-child(3) { width: 35%; text-align: right; }
 .invoice-lines td { padding: 8px 6px; border-bottom: 1px solid #d9dfe2; overflow-wrap: anywhere; }
 .invoice-lines .item-index { color: #71808a; }
 .invoice-lines .quantity { text-align: center; }

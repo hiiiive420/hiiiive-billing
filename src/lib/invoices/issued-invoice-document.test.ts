@@ -32,9 +32,36 @@ describe("issued invoice document service (PostgreSQL integration)", () => {
       assert.equal(document.rendererKey, "hiiiive-default");
       assert.equal(document.invoice.invoiceNumber, "I202610091");
       assert.equal(document.invoice.currencyCode, "LKR");
+      assert.equal(document.invoice.items[0]?.billingMode, "QUANTITY");
       assert.deepEqual(document.config, savedVersion.config);
       assert.equal(document.invoice.grandTotal, "20");
       assert.equal(templateVersionId.length > 0, true);
+    });
+  });
+
+  it("loads the persisted flat-fee mode for historical rendering", async () => {
+    await withIssuedFixture(async ({ organizationId, invoiceId }) => {
+      await prisma.invoiceItem.updateMany({
+        where: { organizationId, invoiceId },
+        data: {
+          billingMode: "FLAT_FEE",
+          quantity: new Prisma.Decimal("1"),
+          unitPrice: new Prisma.Decimal("55000"),
+          lineTotal: new Prisma.Decimal("55000"),
+        },
+      });
+      await issueInvoice(organizationId, invoiceId);
+      const document = await loadIssuedInvoiceDocument(organizationId, invoiceId);
+      assert.equal(document.invoice.items[0]?.billingMode, "FLAT_FEE");
+      assert.equal(document.invoice.items[0]?.quantity, "1");
+      assert.equal(document.invoice.items[0]?.unitPrice, "55000");
+      const html = renderInvoiceHtml(document.rendererKey, { config: document.config, invoice: document.invoice });
+      assert.match(html, /ITEM[\s\S]*SERVICES[\s\S]*AMOUNT/);
+      assert.doesNotMatch(html, /QTY|UNIT PRICE/);
+      assert.doesNotMatch(html, />1<|55,000\.00<\/td>\s*<td class="amount">55,000\.00/);
+      const pdf = await generateIssuedInvoicePdf(organizationId, invoiceId);
+      const pdfText = Buffer.from(pdf.bytes).toString("latin1");
+      assert.equal((pdfText.match(/\/Type\s*\/Page\b/g) ?? []).length, 1);
     });
   });
 

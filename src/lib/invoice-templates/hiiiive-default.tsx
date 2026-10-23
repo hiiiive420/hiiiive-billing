@@ -39,6 +39,7 @@ function buildInvoiceTree({ config: untrustedConfig, invoice }: HiiiiveInvoicePr
   } as CSSProperties;
   const discountIsZero = isZeroDecimal(invoice.discountAmount);
   const currencyCode = normalizeInvoiceCurrencyCode(invoice.currencyCode);
+  const allFlatFee = invoice.items.length > 0 && invoice.items.every((item) => item.billingMode === "FLAT_FEE");
 
   const children: InvoiceNode[] = [element("header", [
     element("h1", [`INVOICE-${invoice.invoiceNumber}`]),
@@ -54,14 +55,19 @@ function buildInvoiceTree({ config: untrustedConfig, invoice }: HiiiiveInvoicePr
   ], { className: "invoice-parties", ariaLabel: "Client and payment information" })];
 
   children.push(element("table", [
-    element("thead", [element("tr", ["ITEM", "SERVICES", "QTY", "UNIT PRICE", "AMOUNT"].map((label) => element("th", [label])))]),
+    element("thead", [element("tr", (allFlatFee
+      ? ["ITEM", "SERVICES", "AMOUNT"]
+      : ["ITEM", "SERVICES", "QTY", "UNIT PRICE", "AMOUNT"]
+    ).map((label) => element("th", [label])))]),
     element("tbody", invoice.items.map((item, index) => element("tr", [
       element("td", [`${index + 1}.`], { className: "item-index" }), element("td", [item.description]),
-      element("td", [item.quantity], { className: "quantity" }),
-      element("td", [formatAmount(item.unitPrice)], { className: "amount" }),
+      ...(!allFlatFee ? [
+        element("td", [item.billingMode === "FLAT_FEE" ? "—" : item.quantity], { className: "quantity" }),
+        element("td", [item.billingMode === "FLAT_FEE" ? "—" : formatAmount(item.unitPrice)], { className: "amount" }),
+      ] : []),
       element("td", [formatAmount(item.lineTotal)], { className: "amount" }),
     ], { key: `${index}-${item.description}` }))),
-  ], { className: "invoice-lines" }));
+  ], { className: `invoice-lines${allFlatFee ? " invoice-lines-flat" : ""}` }));
 
   children.push(element("section", [
     element("div", [element("span", ["SUBTOTAL"]), element("span", [formatAmount(invoice.subtotal)])], { className: "total-row" }),

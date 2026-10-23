@@ -47,10 +47,13 @@ export type DraftInvoiceEditReadModel = Readonly<{
   grandTotal: string;
   items: readonly Readonly<{
     id: string;
+    billingMode: "QUANTITY" | "FLAT_FEE";
     serviceId: string | null;
     description: string;
     quantity: string;
     unitPrice: string;
+    /** Flat-fee amount for the editor; null for quantity-priced items. */
+    amount: string | null;
     lineTotal: string;
     position: number;
   }>[];
@@ -147,6 +150,7 @@ export async function loadDraftInvoiceForEditing(
         where: { organizationId },
         select: {
           id: true,
+          billingMode: true,
           serviceId: true,
           description: true,
           quantity: true,
@@ -175,10 +179,12 @@ export async function loadDraftInvoiceForEditing(
     grandTotal: invoice.grandTotal.toString(),
     items: invoice.items.map((item) => ({
       id: item.id,
+      billingMode: item.billingMode,
       serviceId: item.serviceId,
       description: item.description,
       quantity: item.quantity.toString(),
       unitPrice: item.unitPrice.toString(),
+      amount: item.billingMode === "FLAT_FEE" ? item.unitPrice.toString() : null,
       lineTotal: item.lineTotal.toString(),
       position: item.position,
     })),

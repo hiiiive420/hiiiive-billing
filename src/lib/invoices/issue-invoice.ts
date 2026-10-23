@@ -72,14 +72,24 @@ export async function issueInvoice(
     const lineTotals = invoice.items.map((item) => {
       const quantity = new Prisma.Decimal(item.quantity.toString());
       const unitPrice = new Prisma.Decimal(item.unitPrice.toString());
-      if (quantity.isNegative()) {
-        throw new InvoiceIssuanceError("Invoice item quantity cannot be negative.");
-      }
       if (unitPrice.isNegative()) {
         throw new InvoiceIssuanceError("Invoice item unit price cannot be negative.");
       }
-
-      const lineTotal = calculateInvoiceLineTotal(quantity, unitPrice);
+      let lineTotal: Prisma.Decimal;
+      if (item.billingMode === "FLAT_FEE") {
+        if (!quantity.equals(1)) {
+          throw new InvoiceIssuanceError("Flat-fee items must have the canonical quantity of 1.");
+        }
+        if (!item.lineTotal.equals(unitPrice)) {
+          throw new InvoiceIssuanceError("Flat-fee item total must equal its stored amount.");
+        }
+        lineTotal = unitPrice;
+      } else {
+        if (!quantity.greaterThan(0)) {
+          throw new InvoiceIssuanceError("Invoice item quantity must be positive.");
+        }
+        lineTotal = calculateInvoiceLineTotal(quantity, unitPrice);
+      }
       return { id: item.id, lineTotal };
     });
 

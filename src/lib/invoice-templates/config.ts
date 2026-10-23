@@ -10,6 +10,7 @@ export type HiiiiveTemplateConfig = Readonly<{
 }>;
 
 export type InvoiceLineView = Readonly<{
+  billingMode: "QUANTITY" | "FLAT_FEE";
   description: string;
   quantity: string;
   unitPrice: string;

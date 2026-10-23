@@ -27,7 +27,7 @@ const baseInvoice: InvoiceView = {
   invoiceDate: "2026-10-19",
   clientName: "Visaga Clothing Hub",
   currencyCode: "LKR",
-  items: [{ description: "Price Pointer Artwork", quantity: "185", unitPrice: "100.00", lineTotal: "18500.00" }],
+  items: [{ billingMode: "QUANTITY", description: "Price Pointer Artwork", quantity: "185", unitPrice: "100.00", lineTotal: "18500.00" }],
   subtotal: "18500.00",
   discountLabel: "PREFERRED CLIENT DISCOUNT",
   discountAmount: "4625.00",
@@ -66,8 +66,8 @@ describe("Hiiiive invoice renderer", () => {
     const invoice = {
       ...baseInvoice,
       items: [
-        { description: "First service", quantity: "1", unitPrice: "1", lineTotal: "1" },
-        { description: "Second service", quantity: "1", unitPrice: "1", lineTotal: "1" },
+        { billingMode: "QUANTITY" as const, description: "First service", quantity: "1", unitPrice: "1", lineTotal: "1" },
+        { billingMode: "QUANTITY" as const, description: "Second service", quantity: "1", unitPrice: "1", lineTotal: "1" },
       ],
     };
     const markup = textContent(Renderer({ config: validConfig, invoice }));
@@ -105,6 +105,32 @@ describe("Hiiiive invoice renderer", () => {
     const before = [invoice.subtotal, invoice.discountAmount, invoice.grandTotal, invoice.items[0].lineTotal];
     Renderer({ config: validConfig, invoice });
     assert.deepEqual([invoice.subtotal, invoice.discountAmount, invoice.grandTotal, invoice.items[0].lineTotal], before);
+  });
+
+  it("uses a simplified table for all-flat-fee invoices", () => {
+    const Renderer = resolveInvoiceRenderer("hiiiive-default");
+    const markup = textContent(Renderer({ config: validConfig, invoice: {
+      ...baseInvoice,
+      items: [{ billingMode: "FLAT_FEE", description: "Social Media Management — October 2026", quantity: "1", unitPrice: "55000", lineTotal: "55000" }],
+    } }));
+    assert.match(markup, /ITEMSERVICESAMOUNT/);
+    assert.doesNotMatch(markup, /QTY|UNIT PRICE/);
+    assert.match(markup, /Social Media Management/);
+    assert.match(markup, /55,000\.00/);
+  });
+
+  it("keeps the five-column table for mixed invoices without showing canonical flat-fee values", () => {
+    const Renderer = resolveInvoiceRenderer("hiiiive-default");
+    const markup = textContent(Renderer({ config: validConfig, invoice: {
+      ...baseInvoice,
+      items: [
+        { billingMode: "FLAT_FEE", description: "Flat service", quantity: "1", unitPrice: "55000", lineTotal: "55000" },
+        { billingMode: "QUANTITY", description: "Quantity service", quantity: "4", unitPrice: "1500", lineTotal: "6000" },
+      ],
+    } }));
+    assert.match(markup, /ITEMSERVICESQTYUNIT PRICEAMOUNT/);
+    assert.match(markup, /Flat service——55,000\.00/);
+    assert.match(markup, /Quantity service41,500\.006,000\.00/);
   });
 });
 
