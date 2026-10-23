@@ -6,6 +6,7 @@ import { createDraftInvoice, DraftInvoiceError, updateFullDraftInvoice, type Cre
 import { searchInvoiceClients, searchInvoiceServices } from "@/lib/invoices/invoice-entry-queries";
 import { toCreateDraftInvoiceInput, toUpdateFullDraftInvoiceInput } from "@/lib/invoices/invoice-entry-form-server";
 import { parseInvoiceDraftFormPayload } from "@/lib/invoices/invoice-entry-ui";
+import { issueInvoice, InvoiceIssuanceError } from "@/lib/invoices/issue-invoice";
 
 export async function searchCreateClientsAction(organizationSlug: string, query: string) {
   try {
@@ -82,6 +83,23 @@ export async function updateOrganizationDraftAction(organizationSlug: string, in
     return { ok: true as const };
   } catch (error) {
     return { ok: false as const, error: error instanceof DraftInvoiceError ? error.message : "Could not update this draft. It may no longer be editable." };
+  }
+}
+
+export async function issueOrganizationInvoiceAction(organizationSlug: string, invoiceId: string) {
+  let organizationId: string;
+  try {
+    ({ organizationId } = await requireOrganizationBySlug(organizationSlug, "INVOICE_ISSUE"));
+  } catch (error) {
+    return { ok: false as const, error: accessMessage(error, "Could not issue this invoice.") };
+  }
+  try {
+    const invoice = await issueInvoice(organizationId, invoiceId);
+    return invoice.invoiceNumber
+      ? { ok: true as const, invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber }
+      : { ok: false as const, error: "Invoice issuance did not return a number." };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof InvoiceIssuanceError ? error.message : "Could not issue this invoice." };
   }
 }
 

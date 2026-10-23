@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { IssueInvoiceControl } from "./issue-invoice-control";
 import {
   calculateInvoicePreview,
   DEFAULT_INVOICE_BILLING_MODE,
@@ -29,6 +31,7 @@ export type InvoiceEntryFormActions = {
   searchServices: (query: string) => Promise<SearchActionResult<Service>>;
   saveDraft?: (value: unknown) => Promise<ActionResult<{ invoiceId: string }>>;
   saveDraftChanges?: (invoiceId: string, value: unknown) => Promise<ActionResult>;
+  issueInvoice?: () => Promise<{ ok: true; invoiceId: string; invoiceNumber: string } | { ok: false; error: string }>;
 };
 export type InvoiceEntryPresentation = {
   mode: "development" | "production";
@@ -36,6 +39,7 @@ export type InvoiceEntryPresentation = {
   userLabel?: string;
   role?: string;
   editBasePath: string;
+  previewHref?: string;
 };
 
 const initialItem = (key = "item-0"): Item => ({ key, billingMode: DEFAULT_INVOICE_BILLING_MODE, serviceId: null, serviceQuery: "", selectedService: null, description: "", quantity: "1", unitPrice: "", amount: "", useServiceDefaultPrice: false });
@@ -67,6 +71,7 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
   const [formError, setFormError] = useState("");
   const [savedInvoiceId, setSavedInvoiceId] = useState("");
   const [editSaved, setEditSaved] = useState(false);
+  const [formDirty, setFormDirty] = useState(false);
   const [isPending, startTransition] = useTransition();
   const searchClients = actions.searchClients;
   const searchServices = actions.searchServices;
@@ -86,6 +91,7 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
   }, [searchClients, clientQuery]);
 
   function updateItem(key: string, patch: Partial<Item>) {
+    setFormDirty(true);
     setItems((current) => current.map((item) => item.key === key ? { ...item, ...patch } : item));
   }
 
@@ -104,7 +110,7 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
       if (editing && invoiceId) {
         if (!actions.saveDraftChanges) { setFormError("Draft editing is unavailable."); return; }
         const result = await actions.saveDraftChanges(invoiceId, payload);
-        if (result.ok) setEditSaved(true);
+        if (result.ok) { setEditSaved(true); setFormDirty(false); }
         else setFormError(result.error);
       } else {
         if (!actions.saveDraft) { setFormError("Draft creation is unavailable."); return; }
@@ -123,13 +129,14 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
   }
 
   return (
-    <main className={`entry-page${presentation.mode === "production" ? " entry-page-production" : ""}`}>
+    <main className={`entry-page${presentation.mode === "production" ? " entry-page-production" : ""}`} onChange={() => setFormDirty(true)}>
       {presentation.mode === "development" ? <div className="entry-dev-banner"><span className="entry-dev-dot" /> Development Invoice Entry <span>Development data only</span></div> : <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><span>{presentation.organizationName}</span>{presentation.userLabel && <span className="entry-workspace-user">{presentation.userLabel}{presentation.role ? ` · ${presentation.role}` : ""}</span>}</div>}
       <header className="entry-header">
         <div><div className="entry-eyebrow">INVOICES <span>/</span> {editing ? "EDIT DRAFT" : "NEW"}</div><div className="entry-title-row"><h1>{editing ? "Edit Invoice" : "Create Invoice"}</h1><span className="entry-status"><i /> Draft</span></div></div>
         <div className="entry-actions">
-          <button className="entry-button entry-button-light" type="button" disabled title="Preview is not wired yet">Preview</button>
-          <button className="entry-button entry-button-disabled" type="button" disabled title="Invoice issuance is not available in this task">Issue Invoice</button>
+          {editing && presentation.previewHref && !formDirty ? <Link className="entry-button entry-button-light" href={presentation.previewHref}>Preview</Link> : <button className="entry-button entry-button-light" type="button" disabled title={formDirty ? "Save changes before previewing" : "Save the draft and open it in edit mode to preview"}>Preview</button>}
+          {editing && actions.issueInvoice ? <IssueInvoiceControl issue={actions.issueInvoice} invoiceBasePath={presentation.editBasePath} disabled={formDirty} /> : <button className="entry-button entry-button-disabled" type="button" disabled title="Save the draft and open it in edit mode before issuing">Issue Invoice</button>}
+          {editing && formDirty && <span className="entry-hint">Save changes before previewing or issuing.</span>}
           <button className="entry-button entry-button-primary" type="button" onClick={save} disabled={isPending || lockCreatedDraft}>{isPending ? "Saving…" : editing ? "Save Changes" : savedInvoiceId ? "Draft Saved" : "Save Draft"}</button>
         </div>
       </header>
@@ -143,11 +150,11 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
           <section className="entry-card" aria-labelledby="client-heading">
             <div className="entry-section-heading"><span className="entry-step">01</span><div><h2 id="client-heading">Client</h2><p>Choose who this invoice is for.</p></div></div>
             <div className="entry-field entry-client-search"><label htmlFor="client-search">Search clients</label><input id="client-search" autoComplete="off" placeholder="Search by name, email, or phone" value={clientQuery} onChange={(event) => { setClientQuery(event.target.value); setSelectedClient(null); }} disabled={lockCreatedDraft} />
-              {!selectedClient && clientQuery && clients.length > 0 && <div className="entry-search-results" role="listbox" aria-label="Client search results">{clients.map((client) => <button type="button" role="option" aria-selected="false" key={client.id} onClick={() => { setSelectedClient(client); setClientQuery(client.name); }}>{client.name}<small>{client.email ?? client.phone ?? "Client"}</small></button>)}</div>}
+              {!selectedClient && clientQuery && clients.length > 0 && <div className="entry-search-results" role="listbox" aria-label="Client search results">{clients.map((client) => <button type="button" role="option" aria-selected="false" key={client.id} onClick={() => { setFormDirty(true); setSelectedClient(client); setClientQuery(client.name); }}>{client.name}<small>{client.email ?? client.phone ?? "Client"}</small></button>)}</div>}
               {clientError && <p className="entry-inline-error" role="alert">{clientError}</p>}
               {!selectedClient && !clientError && <p className="entry-hint">Type to search active clients in {presentation.mode === "development" ? "the development organization" : presentation.organizationName}.</p>}
             </div>
-            {selectedClient && <div className="entry-client-summary"><div className="entry-client-avatar">{selectedClient.name.slice(0, 1).toUpperCase()}</div><div><strong>{selectedClient.name}</strong><div>{selectedClient.billingAddress || "No billing address on file"}</div><div>{selectedClient.email || "No email"} <span>·</span> {selectedClient.phone || "No phone"}</div>{selectedClient.active === false && <small className="entry-inline-error">This client is inactive. Choose an active client before saving.</small>}</div><button type="button" className="entry-text-button" onClick={() => { setSelectedClient(null); setClientQuery(""); }} disabled={lockCreatedDraft}>Change</button></div>}
+            {selectedClient && <div className="entry-client-summary"><div className="entry-client-avatar">{selectedClient.name.slice(0, 1).toUpperCase()}</div><div><strong>{selectedClient.name}</strong><div>{selectedClient.billingAddress || "No billing address on file"}</div><div>{selectedClient.email || "No email"} <span>·</span> {selectedClient.phone || "No phone"}</div>{selectedClient.active === false && <small className="entry-inline-error">This client is inactive. Choose an active client before saving.</small>}</div><button type="button" className="entry-text-button" onClick={() => { setFormDirty(true); setSelectedClient(null); setClientQuery(""); }} disabled={lockCreatedDraft}>Change</button></div>}
           </section>
 
           <section className="entry-card" aria-labelledby="details-heading">
@@ -163,9 +170,9 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
           </section>
 
           <section className="entry-card entry-items-card" aria-labelledby="items-heading">
-            <div className="entry-section-heading entry-items-heading"><span className="entry-step">03</span><div><h2 id="items-heading">Items</h2><p>Add a service or enter a custom line item.</p></div><button className="entry-button entry-button-light" type="button" onClick={() => setItems((current) => [...current, initialItem(`item-${nextItemKey.current++}`)])} disabled={lockCreatedDraft}>＋ Add item</button></div>
+            <div className="entry-section-heading entry-items-heading"><span className="entry-step">03</span><div><h2 id="items-heading">Items</h2><p>Add a service or enter a custom line item.</p></div><button className="entry-button entry-button-light" type="button" onClick={() => { setFormDirty(true); setItems((current) => [...current, initialItem(`item-${nextItemKey.current++}`)]); }} disabled={lockCreatedDraft}>＋ Add item</button></div>
             <div className="entry-item-list">
-              {items.map((item, index) => <InvoiceItemRow key={item.key} item={item} index={index} count={items.length} currency={currency} disabled={lockCreatedDraft} searchServices={searchServices} onChange={(patch) => updateItem(item.key, patch)} onRemove={() => setItems((current) => current.filter((candidate) => candidate.key !== item.key))} onMove={(direction) => setItems((current) => { const next = [...current]; const target = index + direction; if (target < 0 || target >= next.length) return current; [next[index]!, next[target]!] = [next[target]!, next[index]!]; return next; })} amount={preview.amountFor(entryItemToPreviewItem(item))} />)}
+              {items.map((item, index) => <InvoiceItemRow key={item.key} item={item} index={index} count={items.length} currency={currency} disabled={lockCreatedDraft} searchServices={searchServices} onChange={(patch) => updateItem(item.key, patch)} onRemove={() => { setFormDirty(true); setItems((current) => current.filter((candidate) => candidate.key !== item.key)); }} onMove={(direction) => { setFormDirty(true); setItems((current) => { const next = [...current]; const target = index + direction; if (target < 0 || target >= next.length) return current; [next[index]!, next[target]!] = [next[target]!, next[index]!]; return next; }); }} amount={preview.amountFor(entryItemToPreviewItem(item))} />)}
             </div>
             {items.length === 0 && <p className="entry-empty-items">No items yet. Add an item to begin.</p>}
           </section>
@@ -186,7 +193,6 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
           <div className="entry-total-payable"><span>Amount payable</span><strong>{currency} {formatMoneyDisplay(preview.payable)}</strong></div>
           <p className="entry-preview-note">Preview only. Final totals are calculated and validated when saved.</p>
           <button className="entry-button entry-button-primary entry-summary-save" type="button" onClick={save} disabled={isPending || lockCreatedDraft}>{isPending ? "Saving…" : editing ? "Save Changes" : savedInvoiceId ? "Draft Saved" : "Save Draft"}</button>
-          <button className="entry-issue-disabled" type="button" disabled>Issue Invoice <span>Unavailable</span></button>
         </aside>
       </div>
       <footer className="entry-footer">{presentation.mode === "development" && <span>Development entry only</span>}<span>Invoice totals are confirmed by the server on save.</span></footer>

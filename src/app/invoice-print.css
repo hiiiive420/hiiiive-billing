@@ -24,6 +24,12 @@ body {
   box-shadow: 0 2px 8px rgb(20 38 50 / 10%);
 }
 
+.document-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.document-actions .issue-control { display: flex; align-items: center; }
+.issue-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 720px; }
+.issue-confirm p { flex-basis: 100%; margin: 0 0 4px; }
+.issue-control .entry-error { margin: 0; }
+
 .invoice-preview-frame {
   display: flex;
   justify-content: center;

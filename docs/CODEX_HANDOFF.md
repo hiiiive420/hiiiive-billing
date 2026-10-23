@@ -1,40 +1,36 @@
 ﻿# Codex Handoff
 
 ## Task
-INV-021 — Authenticated Production Invoice Workspace
+INV-022 — Preview, Issue & PDF Workflow
 
 ## Status
-Complete. Authenticated production draft create/edit routes are implemented; Preview and Issue remain disabled.
+Complete. Authenticated DRAFT preview, invoice issuance, issued invoice viewing, and PDF download are implemented.
 
-## Summary
-Added the first production invoice workspace using the INV-020 Cloudflare Access identity and RBAC foundation. Organization slugs are selectors resolved only through the current user's active memberships. Production actions independently authorize each search and mutation. The existing responsive invoice form is shared by production and development routes.
+## Routes / Actions Added
+- `/app/[organizationSlug]/invoices/[invoiceId]/preview` — read-only DRAFT preview.
+- `/app/[organizationSlug]/invoices/[invoiceId]` — read-only issued/closed invoice document.
+- `/app/[organizationSlug]/invoices/[invoiceId]/pdf` — authenticated PDF attachment download.
+- `issueOrganizationInvoiceAction()` — `INVOICE_ISSUE` protected server action calling `issueInvoice()`.
 
-## Routes Added
-- `/app` — redirects users with one active membership, lists only their organizations when multiple, and gives an access/provisioning message when unavailable.
-- `/app/[organizationSlug]/invoices/new` — permission-protected draft creation.
-- `/app/[organizationSlug]/invoices/[invoiceId]/edit` — DRAFT-only edit loading and saving.
+## Preview / Issue Behavior
+Preview requires `INVOICE_EDIT_DRAFT`, rejects issued or otherwise non-editable records, and performs no writes or sequence allocation. It uses the current active default template and current client data, labels the result `DRAFT PREVIEW`, and uses server Decimal arithmetic for displayed totals. This preview is not frozen. The edit form enables Preview and Issue only for saved drafts without unsaved changes. Issuance requires an explicit confirmation; the UI explains that numbering, invoice date, client details, and template version become permanent. Successful issue navigates to the read-only issued invoice page.
 
-## Organization / Authorization Behavior
-`requireOrganizationBySlug()` searches only `getCurrentUserMemberships()` and returns the trusted membership organization ID after checking permission. An inaccessible slug receives the same not-found behavior whether invalid, foreign, or inactive. `INVOICE_CREATE` protects create page and its search/save actions; `INVOICE_EDIT_DRAFT` protects edit page and its search/save actions. Client-supplied organization IDs, roles, users, and membership IDs are ignored by form parsing.
+## Issued Document / PDF Integrity
+The issued page and PDF route use `loadIssuedInvoiceDocument()` and therefore render persisted amounts, client snapshots, and the invoice's frozen template version. Only ISSUED, SUPERSEDED, VOID, and WRITTEN_OFF invoices render. Missing or invalid historical template data fails explicitly. PDF responses use `application/pdf`, a validated invoice-number filename, attachment disposition, `private, no-store`, and `nosniff`.
 
-## Shared Form Reuse
-Moved the single form UI to `src/components/invoices/invoice-entry-form.tsx` and injects server action references and presentation details. Development routes retain their fixture actions and development labels. Production shows Hiiiive Billing, organization, current user, and role without development messaging. Existing responsive, quantity/flat-fee, search, money formatting, preview, and discount behavior remains shared.
+## Authorization / Concurrency
+Preview requires `INVOICE_EDIT_DRAFT`; issuance requires `INVOICE_ISSUE`; issued page and PDF require `INVOICE_READ`. Each operation resolves its organization from the authenticated user's active membership, never client organization input. `issueInvoice()` retains its row lock, conditional DRAFT transition, and transactional sequence reservation. Existing integration tests cover edit/issue serialization and concurrent double issuance.
 
-## Create / Edit Behavior
-Create uses `createDraftInvoice()` with parsed editable fields and trusted organization scope; success links to the production edit route. Edit loads through `loadDraftInvoiceForEditing()` and saves through atomic `updateFullDraftInvoice()`. Persisted totals and lifecycle/payment state remain server-controlled. Saved service prices are restored as entered and current defaults are not reapplied.
+## Files Changed
+Production invoice action/form controls, draft preview loader, issued document metadata, preview/issued/PDF routes, focused authorization coverage, and Architecture, Business Rules, Security, and this handoff documentation.
 
 ## Tests and Checks
-- `npm test` — passed: 118 unit/integration tests and 8 PDF tests.
+- `npm test` — passed: 120 unit/integration tests and 8 PDF tests.
 - `npm run typecheck` — passed.
 - `npm run lint` — passed.
 - `npm run build` — passed; production routes are dynamic and present at the intended paths.
-- `npm run db:migrate:status` — passed; all 10 migrations are applied. No migration was needed.
+- `npm run db:migrate:status` — passed; all 10 migrations are applied. No migration was required.
 - `npm audit --omit=dev` — passed; 0 production dependency vulnerabilities.
 
-Production action tests cover BILLING and ADMIN create/edit, VIEWER denial, searches, forged organization/role/status/total fields, foreign organization scope, quantity/flat-fee/free-text items, preserved explicit service price, and full draft updates. Existing invoice service tests cover cross-tenant and non-DRAFT edit rejection.
-
-## Security Notes
-Production actions never call the development organization helper. Slugs are resolved through active persisted memberships, permissions are checked on every Server Action, and no client organization ID is accepted. No production list/history, payment, Preview, or Issue behavior was added. Existing `/dev/invoices/*` routes retain their production not-found guards and fixture context.
-
 ## Blockers / Next Step
-Local production-route testing requires `DEV_AUTH_EMAIL` to identify an existing active `User` with an active `OrganizationMembership`. Production deployment still requires Cloudflare Access audience/team configuration, enforced MFA, and origin protection. Preview and Issue are deferred to INV-022.
+Production deployment needs Cloudflare Access team/audience configuration, enforced MFA, origin protection, and a configured Chromium executable. Next task: INV-023 — OpenAI Natural-Language Quick Invoice.

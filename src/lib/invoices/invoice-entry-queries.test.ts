@@ -12,6 +12,7 @@ import {
   searchInvoiceServices,
 } from "./invoice-entry-queries";
 import { issueInvoice } from "./issue-invoice";
+import { DraftInvoicePreviewError, loadDraftInvoicePreview } from "./draft-invoice-preview";
 
 const prisma = getPrismaClient();
 const templateConfig = {
@@ -145,6 +146,53 @@ describe("invoice entry read queries (PostgreSQL integration)", () => {
     const model = await loadDraftInvoiceForEditing(organizationId, invoice.id);
     assert.equal(model.items[0]?.billingMode, "FLAT_FEE");
     assert.equal(model.items[0]?.amount, "55000");
+  }));
+
+  it("renders a read-only draft preview from current default template with exact totals", async () => withFixture(async ({ organizationId, clientId, templateId }) => {
+    await prisma.invoiceTemplate.update({ where: { id: templateId }, data: { isDefault: true } });
+    const invoice = await createDraftInvoice(organizationId, {
+      clientId, projectTitle: "Preview work", invoiceDate: new Date("2026-10-20T00:00:00.000Z"), currencyCode: "USD",
+      discountLabel: "Courtesy", discountAmount: "1.0000", items: [
+        { description: "Rounded line", quantity: "1.3333", unitPrice: "10.5555" },
+        { billingMode: "FLAT_FEE", description: "Flat project fee", amount: "5" },
+      ],
+    });
+    const before = await prisma.invoice.findFirstOrThrow({ where: { organizationId, id: invoice.id } });
+    const sequenceBefore = await prisma.invoiceSequence.findFirst({ where: { organizationId } });
+    const preview = await loadDraftInvoicePreview(organizationId, invoice.id);
+    assert.equal(preview.invoice.invoiceNumber, "DRAFT PREVIEW");
+    assert.equal(preview.invoice.clientName, "Fixture Client");
+    assert.equal(preview.invoice.items[0]?.lineTotal, "14.0736");
+    assert.equal(preview.invoice.items[1]?.lineTotal, "5");
+    assert.equal(preview.invoice.subtotal, "19.0736");
+    assert.equal(preview.invoice.grandTotal, "18.0736");
+    const after = await prisma.invoice.findFirstOrThrow({ where: { organizationId, id: invoice.id } });
+    assert.equal(after.lifecycleStatus, "DRAFT");
+    assert.equal(after.invoiceNumber, null);
+    assert.equal(after.templateVersionId, null);
+    assert.equal(after.updatedAt.toISOString(), before.updatedAt.toISOString());
+    assert.deepEqual(await prisma.invoiceSequence.findFirst({ where: { organizationId } }), sequenceBefore);
+    await issueInvoice(organizationId, invoice.id);
+    await assert.rejects(loadDraftInvoicePreview(organizationId, invoice.id), DraftInvoicePreviewError);
+  }));
+
+  it("rejects flat-fee preview when persisted canonical line total is inconsistent without reserving a number", async () => withFixture(async ({ organizationId, clientId, templateId }) => {
+    await prisma.invoiceTemplate.update({ where: { id: templateId }, data: { isDefault: true } });
+    const invoice = await createDraftInvoice(organizationId, {
+      clientId,
+      items: [{ billingMode: "FLAT_FEE", description: "Flat fee", amount: "55000" }],
+    });
+    await prisma.invoiceItem.updateMany({
+      where: { organizationId, invoiceId: invoice.id },
+      data: { lineTotal: new Prisma.Decimal("54999") },
+    });
+    const beforeSequence = await prisma.invoiceSequence.findFirst({ where: { organizationId } });
+    await assert.rejects(loadDraftInvoicePreview(organizationId, invoice.id), DraftInvoicePreviewError);
+    assert.deepEqual(await prisma.invoiceSequence.findFirst({ where: { organizationId } }), beforeSequence);
+    const persisted = await prisma.invoiceItem.findFirstOrThrow({ where: { organizationId, invoiceId: invoice.id } });
+    assert.equal(persisted.quantity.toString(), "1");
+    assert.equal(persisted.unitPrice.toString(), "55000");
+    assert.equal(persisted.lineTotal.toString(), "54999");
   }));
 
   it("returns saved service details without replacing the draft's explicit item price", async () => withFixture(async ({ organizationId, clientId }) => {

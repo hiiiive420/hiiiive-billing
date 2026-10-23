@@ -8,6 +8,7 @@ import { getPrismaClient } from "@/lib/prisma";
 import { loadDraftInvoiceForEditing } from "@/lib/invoices/invoice-entry-queries";
 import {
   createOrganizationDraftAction,
+  issueOrganizationInvoiceAction,
   searchCreateClientsAction,
   searchEditServicesAction,
   updateOrganizationDraftAction,
@@ -103,6 +104,10 @@ describe("production invoice Server Actions (PostgreSQL integration)", () => {
         ],
       };
       assert.deepEqual(await updateOrganizationDraftAction(org.slug, created.invoiceId, updatePayload), { ok: true });
+      const missingTemplateIssue = await issueOrganizationInvoiceAction(org.slug, created.invoiceId);
+      assert.equal(missingTemplateIssue.ok, false);
+      if (!missingTemplateIssue.ok) assert.match(missingTemplateIssue.error, /active default invoice template/i);
+      assert.equal((await prisma.invoice.findFirstOrThrow({ where: { id: created.invoiceId } })).lifecycleStatus, "DRAFT");
       const edited = await loadDraftInvoiceForEditing(org.id, created.invoiceId);
       assert.equal(edited.currencyCode, "CAD");
       assert.equal(edited.items[0]?.unitPrice, "12.5");
@@ -129,6 +134,9 @@ describe("production invoice Server Actions (PostgreSQL integration)", () => {
       assert.equal((await searchEditServicesAction(org.slug, "")).ok, false);
       assert.equal((await createOrganizationDraftAction(org.slug, updatePayload)).ok, false);
       assert.equal((await updateOrganizationDraftAction(org.slug, created.invoiceId, updatePayload)).ok, false);
+      const viewerIssue = await issueOrganizationInvoiceAction(org.slug, created.invoiceId);
+      assert.equal(viewerIssue.ok, false);
+      if (!viewerIssue.ok) assert.match(viewerIssue.error, /permission/i);
       assert.equal((await loadDraftInvoiceForEditing(org.id, created.invoiceId)).id, created.invoiceId);
 
       await prisma.organizationMembership.updateMany({ where: { organizationId: org.id, userId: user.id }, data: { active: false } });

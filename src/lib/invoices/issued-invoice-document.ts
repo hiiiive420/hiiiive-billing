@@ -17,6 +17,8 @@ export class IssuedInvoiceDocumentError extends Error {
 export type IssuedInvoiceDocument = Readonly<{
   rendererKey: string;
   config: unknown;
+  lifecycleStatus: "ISSUED" | "SUPERSEDED" | "VOID" | "WRITTEN_OFF";
+  paymentStatus: "UNPAID" | "PARTIALLY_PAID" | "PAID";
   invoice: InvoiceView;
 }>;
 
@@ -32,6 +34,7 @@ export async function loadIssuedInvoiceDocument(
       id: true,
       organizationId: true,
       lifecycleStatus: true,
+      paymentStatus: true,
       templateVersionId: true,
       invoiceNumber: true,
       projectTitle: true,
@@ -87,6 +90,8 @@ export async function loadIssuedInvoiceDocument(
   return {
     rendererKey: invoice.templateVersion.rendererKey,
     config,
+    lifecycleStatus: invoice.lifecycleStatus as IssuedInvoiceDocument["lifecycleStatus"],
+    paymentStatus: invoice.paymentStatus,
     invoice: {
       invoiceNumber: invoice.invoiceNumber,
       projectTitle: invoice.projectTitle,
