@@ -1,47 +1,40 @@
 ﻿# Codex Handoff
 
 ## Task
-INV-020 — Authentication Context & Server-Side RBAC Foundation
+INV-021 — Authenticated Production Invoice Workspace
 
 ## Status
-Complete. Production Cloudflare Access identity verification and server-side organization RBAC helpers are implemented. No production invoice workspace or login UI was added.
+Complete. Authenticated production draft create/edit routes are implemented; Preview and Issue remain disabled.
 
 ## Summary
-Production requests authenticate only through a verified `Cf-Access-Jwt-Assertion`. The normalized verified email must map to an existing active `User`; organization access requires an active persisted membership. `ADMIN`, `BILLING`, and `VIEWER` permissions are centralized in a typed server-only authorization module. Local development can use an explicit `DEV_AUTH_EMAIL`; production cannot.
+Added the first production invoice workspace using the INV-020 Cloudflare Access identity and RBAC foundation. Organization slugs are selectors resolved only through the current user's active memberships. Production actions independently authorize each search and mutation. The existing responsive invoice form is shared by production and development routes.
 
-## Files Changed
-- `src/lib/auth/identity.ts` — development identity, Cloudflare Access configuration and JWT verification, request identity.
-- `src/lib/auth/authorization.ts` — current user, memberships, organization permission checks, typed role matrix.
-- `src/lib/auth/identity.test.ts`, `src/lib/auth/authorization.test.ts` — offline JWT/unit and PostgreSQL authorization coverage.
-- `package.json`, `package-lock.json` — `jose` dependency and auth tests.
-- `.env.example` — placeholders for the three auth settings.
-- `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATABASE.md` — current trust chain, authorization and email normalization behavior.
+## Routes Added
+- `/app` — redirects users with one active membership, lists only their organizations when multiple, and gives an access/provisioning message when unavailable.
+- `/app/[organizationSlug]/invoices/new` — permission-protected draft creation.
+- `/app/[organizationSlug]/invoices/[invoiceId]/edit` — DRAFT-only edit loading and saving.
 
-## Authentication Flow
-Cloudflare Access (with deployment-enforced MFA) → `Cf-Access-Jwt-Assertion` → JOSE RS256/JWKS verification with configured issuer and audience → normalized email → existing active `User` → active organization membership → centralized permission → tenant-scoped service. No user auto-provisioning, password auth, or production invoice routes were added. The origin must not be reachable around Cloudflare Access.
+## Organization / Authorization Behavior
+`requireOrganizationBySlug()` searches only `getCurrentUserMemberships()` and returns the trusted membership organization ID after checking permission. An inaccessible slug receives the same not-found behavior whether invalid, foreign, or inactive. `INVOICE_CREATE` protects create page and its search/save actions; `INVOICE_EDIT_DRAFT` protects edit page and its search/save actions. Client-supplied organization IDs, roles, users, and membership IDs are ignored by form parsing.
 
-## RBAC / Permission Behavior
-- `ADMIN`: all defined permissions.
-- `BILLING`: invoice read/create/draft edit/issue and payment read/record.
-- `VIEWER`: invoice read and payment read only.
-- Unknown roles fail closed. Missing, foreign, and inactive memberships share the same denial behavior.
-- No membership mutation service exists; future membership changes must transactionally prevent removing or demoting the last active ADMIN.
+## Shared Form Reuse
+Moved the single form UI to `src/components/invoices/invoice-entry-form.tsx` and injects server action references and presentation details. Development routes retain their fixture actions and development labels. Production shows Hiiiive Billing, organization, current user, and role without development messaging. Existing responsive, quantity/flat-fee, search, money formatting, preview, and discount behavior remains shared.
 
-## Development Authentication
-`DEV_AUTH_EMAIL` is required for local identity and normalized with the same email rules. There is no default; missing configuration fails clearly. The production request path never reads it and requires the Access JWT. Existing development invoice routes keep their fixed dev organization context.
+## Create / Edit Behavior
+Create uses `createDraftInvoice()` with parsed editable fields and trusted organization scope; success links to the production edit route. Edit loads through `loadDraftInvoiceForEditing()` and saves through atomic `updateFullDraftInvoice()`. Persisted totals and lifecycle/payment state remain server-controlled. Saved service prices are restored as entered and current defaults are not reapplied.
 
 ## Tests and Checks
-- `npm test` — passed: 117 unit/integration tests and 8 PDF tests.
+- `npm test` — passed: 118 unit/integration tests and 8 PDF tests.
 - `npm run typecheck` — passed.
 - `npm run lint` — passed.
-- `npm run build` — passed; no production invoice workspace route was added.
-- `npm run db:migrate:status` — passed; all 10 migrations are applied, no migration was needed.
+- `npm run build` — passed; production routes are dynamic and present at the intended paths.
+- `npm run db:migrate:status` — passed; all 10 migrations are applied. No migration was needed.
 - `npm audit --omit=dev` — passed; 0 production dependency vulnerabilities.
 
-JWT tests use generated local RSA keys and local JWKS data; they do not contact Cloudflare. PostgreSQL integration tests cover provisioned/unknown/inactive users, active/inactive and cross-organization memberships, persisted roles, and authorization.
+Production action tests cover BILLING and ADMIN create/edit, VIEWER denial, searches, forged organization/role/status/total fields, foreign organization scope, quantity/flat-fee/free-text items, preserved explicit service price, and full draft updates. Existing invoice service tests cover cross-tenant and non-DRAFT edit rejection.
 
 ## Security Notes
-Plain `Cf-Access-Authenticated-User-Email` is ignored. JWT content is not returned as identity or logged. Unknown/inactive application users are not provisioned. Authorization derives roles only from persisted memberships, never from client input.
+Production actions never call the development organization helper. Slugs are resolved through active persisted memberships, permissions are checked on every Server Action, and no client organization ID is accepted. No production list/history, payment, Preview, or Issue behavior was added. Existing `/dev/invoices/*` routes retain their production not-found guards and fixture context.
 
 ## Blockers / Next Step
-Configure `CLOUDFLARE_ACCESS_TEAM_DOMAIN` and `CLOUDFLARE_ACCESS_AUD` in the production server environment, enforce MFA and origin protection in Cloudflare, then use these helpers when the production workspace is introduced. No last-active-admin mutation service exists yet.
+Local production-route testing requires `DEV_AUTH_EMAIL` to identify an existing active `User` with an active `OrganizationMembership`. Production deployment still requires Cloudflare Access audience/team configuration, enforced MFA, and origin protection. Preview and Issue are deferred to INV-022.

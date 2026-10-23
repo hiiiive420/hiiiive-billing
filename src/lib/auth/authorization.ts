@@ -44,6 +44,13 @@ export class ProvisioningError extends Error {
   }
 }
 
+export class OrganizationContextNotFoundError extends Error {
+  constructor() {
+    super("This organization is not accessible.");
+    this.name = "OrganizationContextNotFoundError";
+  }
+}
+
 /** Unknown or future roles and permissions are denied by default. */
 export function hasPermission(role: unknown, permission: Permission): boolean {
   if (typeof role !== "string" || !Object.hasOwn(ROLE_PERMISSIONS, role)) return false;
@@ -102,4 +109,23 @@ export async function requireOrganizationPermission(
     throw new AuthorizationError("You do not have permission to perform this action.");
   }
   return membership;
+}
+
+/** Resolves a URL slug only by inspecting the current user's active memberships. */
+export async function requireOrganizationBySlug(slug: string, permission: Permission) {
+  const memberships = await getCurrentUserMemberships();
+  const membership = memberships.find((candidate) => candidate.organization.slug === slug);
+  if (!membership) throw new OrganizationContextNotFoundError();
+  if (!hasPermission(membership.role, permission)) {
+    throw new AuthorizationError("You do not have permission to perform this action.");
+  }
+  const user = await requireCurrentUser();
+  return {
+    organizationId: membership.organizationId,
+    organizationSlug: membership.organization.slug,
+    organizationName: membership.organization.name,
+    userId: membership.userId,
+    userLabel: user.displayName ?? user.email,
+    role: membership.role,
+  };
 }

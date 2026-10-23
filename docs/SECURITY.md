@@ -20,6 +20,9 @@ Outside production, `DEV_AUTH_EMAIL` provides a deliberately explicit server-onl
 - MVP1 intends one dedicated account with `ADMIN`; Krishna and working team members use `BILLING`; `VIEWER` is reserved for future read-only use.
 - The schema does not limit the number of ADMIN memberships. Future application/service logic must prevent removing or demoting the last active ADMIN in an organization.
 - No membership mutation service exists yet. Any future membership role/deactivation service must enforce the last-active-ADMIN invariant transactionally.
+- Production invoice URLs use `organizationSlug` only as a selector. The application resolves it by inspecting the current user's active memberships; it never looks up a global organization first. Unknown, foreign, and inactive membership slugs return the same inaccessible/not-found behavior. The trusted `organizationId` comes from the resolved persisted membership.
+- Every production invoice search and save Server Action independently authenticates and resolves the organization slug through membership, then checks `INVOICE_CREATE` or `INVOICE_EDIT_DRAFT`. Production actions accept no trusted organization ID, role, user ID, or membership ID from form/client state. Draft editing calls `updateFullDraftInvoice()` so header, items, and server-calculated totals update atomically.
+- `/app` lists only active organizations from the authenticated user's memberships. It does not persist an organization selection in a client cookie. `VIEWER` cannot use create or edit pages or their directly invoked actions.
 
 ## Financial integrity
 

@@ -9,10 +9,12 @@ import {
   AuthorizationError,
   getCurrentUserMemberships,
   hasPermission,
+  OrganizationContextNotFoundError,
   PERMISSIONS,
   ProvisioningError,
   requireCurrentUser,
   requireOrganizationMembership,
+  requireOrganizationBySlug,
   requireOrganizationPermission,
 } from "./authorization";
 
@@ -65,8 +67,12 @@ describe("organization authorization (PostgreSQL integration)", () => {
       assert.equal(memberships[0]?.organization.slug, organization.slug);
       assert.equal((await requireOrganizationMembership(organization.id)).role, OrganizationRole.BILLING);
       assert.equal((await requireOrganizationPermission(organization.id, "INVOICE_EDIT_DRAFT")).role, OrganizationRole.BILLING);
+      const ownContext = await requireOrganizationBySlug(organization.slug, "INVOICE_CREATE");
+      assert.equal(ownContext.organizationId, organization.id);
+      assert.equal(ownContext.role, OrganizationRole.BILLING);
       await assert.rejects(requireOrganizationPermission(organization.id, "USER_ADMIN"), AuthorizationError);
       await assert.rejects(requireOrganizationMembership(foreignOrganization.id), AuthorizationError);
+      await assert.rejects(requireOrganizationBySlug(foreignOrganization.slug, "INVOICE_CREATE"), OrganizationContextNotFoundError);
 
       await prisma.organizationMembership.updateMany({ where: { organizationId: organization.id, userId: user.id }, data: { active: false } });
       assert.deepEqual(await getCurrentUserMemberships(), []);
