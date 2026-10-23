@@ -6,15 +6,20 @@ The browser is an untrusted client. Never accept browser-supplied totals, invoic
 
 ## Authentication and user identities
 
-Authentication is not implemented. Future authentication may map an externally authenticated email identity, such as Cloudflare Access, to `User.email`. Email identities must be normalized to lowercase before storage and before lookup. No passwords, sessions, OAuth tables, or authentication-provider integration are part of the current database foundation.
+Production request identity is established by Cloudflare Access. Cloudflare Access must enforce the deployment's required MFA policy and protect the application origin. The application reads only `Cf-Access-Jwt-Assertion`, verifies it with `jose` against the public JWKS endpoint derived from `CLOUDFLARE_ACCESS_TEAM_DOMAIN`, and requires the configured issuer, `CLOUDFLARE_ACCESS_AUD`, an RS256 signature, expiration, subject, and email. A present `nbf` is validated by JWT verification. Missing configuration or an invalid token fails closed. No private Cloudflare signing key is required or stored.
+
+The trust chain is: Internet → Cloudflare → Cloudflare Access and mandatory MFA → verified Access JWT at the origin → existing active `User` → active `OrganizationMembership` → centralized role permission → organization-scoped service. A Cloudflare-authenticated identity does not automatically receive application access; its normalized lowercase email must match a provisioned active `User`, and the user must have an active membership in the requested organization. Users are never auto-provisioned during authentication. Plain `Cf-Access-Authenticated-User-Email` or any other unsigned identity header is not authentication evidence. The origin must be configured so requests cannot bypass Cloudflare Access.
+
+Outside production, `DEV_AUTH_EMAIL` provides a deliberately explicit server-only local identity. It has no default and is always rejected in production. Production identity always requires a verified Access JWT. The application does not implement passwords, sessions, or application MFA; MFA is an infrastructure requirement enforced by Cloudflare Access.
 
 ## Authorization, RBAC, and tenant isolation
 
 - RBAC is organization-scoped through `OrganizationMembership`; a user's role applies within that organization.
 - UI visibility is not authorization. Hiding controls or pages does not protect data or operations.
-- Future application permissions must be enforced server-side on every protected operation, with organization scoping on every organization-owned read and write.
+- `src/lib/auth/authorization.ts` centralizes the server-side permission matrix. Every protected operation must enforce permission and organization scope on the server; UI visibility is not authorization.
 - MVP1 intends one dedicated account with `ADMIN`; Krishna and working team members use `BILLING`; `VIEWER` is reserved for future read-only use.
 - The schema does not limit the number of ADMIN memberships. Future application/service logic must prevent removing or demoting the last active ADMIN in an organization.
+- No membership mutation service exists yet. Any future membership role/deactivation service must enforce the last-active-ADMIN invariant transactionally.
 
 ## Financial integrity
 

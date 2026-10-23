@@ -17,7 +17,7 @@ The initial Prisma migration is `20261020151624_init_master_data` (`init_master_
 ### User
 
 - Represents an authenticated human identity; UUID primary key, globally unique email, optional `displayName`, `active` defaulting true, and timestamps.
-- Email is the primary login identity. Future application logic must normalize email to lowercase before storing or looking it up. The database uniqueness constraint is global; normalization is an application responsibility.
+- Email is the primary login identity. Authentication normalizes verified email to lowercase before lookup; provisioning code must store normalized lowercase addresses. The database uniqueness constraint is global; normalization is an application responsibility.
 - No password or authentication-provider data is implemented.
 
 ### OrganizationMembership
