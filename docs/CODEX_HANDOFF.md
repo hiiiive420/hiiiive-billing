@@ -150,3 +150,33 @@ Removed dynamic selected classes from the billing-method labels and styled selec
 ## Blockers
 
 None known.
+
+---
+
+# Task ID: INV-018 — Atomic Full Draft Update Service
+
+- **Status:** Complete
+
+## Summary
+
+Added server-only `updateFullDraftInvoice(organizationId, invoiceId, input)` for complete draft-form updates. It replaces the full item list and writes all editable invoice header fields and server-derived totals atomically. It reuses the existing item preparation, service default, currency, Decimal, and total validation helpers. No edit UI or migration was added.
+
+## Transaction and security behavior
+
+- Locks the tenant-scoped invoice row with `SELECT ... FOR UPDATE`, using the same lock as targeted draft edits and `issueInvoice()`.
+- Rejects cross-organization, non-DRAFT, numbered, or issued-at invoices; requires an active same-organization client and validates all active same-organization services.
+- Validates/prepares all items and totals before replacement, then deletes/recreates items and updates the invoice within the same Prisma transaction. Errors roll back both item and header changes.
+- Does not update issuance snapshots or reserve invoice sequence values. Full invoice-form draft edits must use this service; do not chain header and item update transactions.
+
+## Tests and checks
+
+- PostgreSQL integration coverage includes full header/item updates, quantity and flat-fee items, free-text and service-backed items, service default opt-in/currency rules, explicit price precedence, tenant/activity validation, invalid item/discount rollback, issued and cross-tenant rejection, sequence non-consumption, and edit-versus-issue serialization.
+- `npm test` — passed, 110 unit/integration tests and 8 PDF tests.
+- `npm run typecheck` — passed.
+- `npm run lint` — passed.
+- `npm run build` — passed.
+- `npm run db:migrate:status` — passed; all 10 migrations are applied. No migration was needed.
+
+## Blockers
+
+None known.

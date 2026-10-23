@@ -48,6 +48,20 @@ export type CreateDraftInvoiceInput = Readonly<{
   items: readonly DraftInvoiceItemInput[];
 }>;
 
+/** Complete editable form state for one atomic draft update. */
+export type UpdateFullDraftInvoiceInput = Readonly<{
+  clientId: string;
+  projectTitle: string | null;
+  invoiceDate: Date | null;
+  dueDate: Date | null;
+  currencyCode: string;
+  discountLabel: string | null;
+  discountAmount: string;
+  notes: string | null;
+  paymentTerms: string | null;
+  items: readonly DraftInvoiceItemInput[];
+}>;
+
 export type UpdateDraftInvoiceInput = Readonly<{
   clientId?: string;
   projectTitle?: string | null;
@@ -204,6 +218,52 @@ export async function replaceDraftInvoiceItems(
       data: { subtotal: totals.subtotal, grandTotal: totals.grandTotal },
     });
     if (updated.count !== 1) throw new DraftInvoiceError("Only draft invoices may be edited.");
+    return tx.invoice.findFirstOrThrow({ where: { id: invoiceId, organizationId } });
+  });
+}
+
+/** Replace every editable draft field and all items in one locked database transaction. */
+export async function updateFullDraftInvoice(
+  organizationId: string,
+  invoiceId: string,
+  input: UpdateFullDraftInvoiceInput,
+): Promise<Invoice> {
+  const prisma = getPrismaClient();
+  return prisma.$transaction(async (tx) => {
+    await lockAndLoadDraft(tx, organizationId, invoiceId);
+    await requireActiveClient(tx, organizationId, input.clientId);
+    const currencyCode = normalizeCurrency(input.currencyCode);
+    const items = await prepareItems(tx, organizationId, currencyCode, input.items);
+    const discountAmount = parseDecimal(input.discountAmount, "Discount amount");
+    const totals = calculateAndValidateTotals(items, discountAmount);
+
+    await tx.invoiceItem.deleteMany({ where: { organizationId, invoiceId } });
+    await tx.invoiceItem.createMany({
+      data: items.map((item) => ({ ...item, organizationId, invoiceId })),
+    });
+    const updated = await tx.invoice.updateMany({
+      where: {
+        id: invoiceId,
+        organizationId,
+        lifecycleStatus: "DRAFT",
+        invoiceNumber: null,
+        issuedAt: null,
+      },
+      data: {
+        clientId: input.clientId,
+        projectTitle: input.projectTitle ?? null,
+        invoiceDate: validDate(input.invoiceDate, "Invoice date"),
+        dueDate: validDate(input.dueDate, "Due date"),
+        currencyCode,
+        discountLabel: input.discountLabel ?? null,
+        discountAmount,
+        subtotal: totals.subtotal,
+        grandTotal: totals.grandTotal,
+        notes: input.notes ?? null,
+        paymentTerms: input.paymentTerms ?? null,
+      },
+    });
+    if (updated.count !== 1) throw new DraftInvoiceError("Only unissued draft invoices may be edited.");
     return tx.invoice.findFirstOrThrow({ where: { id: invoiceId, organizationId } });
   });
 }

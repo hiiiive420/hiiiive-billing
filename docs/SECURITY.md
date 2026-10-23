@@ -60,7 +60,8 @@ Authentication is not implemented. Future authentication may map an externally a
 - `/dev/invoices/new` is available only outside production and returns not-found in production. Its Server Actions repeat the environment guard because Server Actions can be invoked directly by POST requests.
 - An isolated development helper upserts a fixed `hiiiive` organization plus deterministic sample client/service records. It is guarded against production use. No URL, query, form, hidden field, or client state can choose an organization. Search and draft creation always use this resolved ID.
 - Search actions call `searchInvoiceClients()` and `searchInvoiceServices()`; the browser does not implement tenant search. Draft save whitelists editable form fields and calls `createDraftInvoice()`. The draft service validates tenant ownership and recalculates all persisted totals. The UI sends no status, invoice number, issue timestamp, template version, subtotal, grand total, or line total.
-- The route has no production invoice mutation API. Preview and Issue Invoice controls are disabled. Draft editing is deferred; when implemented, header and item changes must be atomic in a server-side service.
+- Full invoice-form draft edits must use `updateFullDraftInvoice()` with organization scope from trusted server context. It locks the invoice row, validates the complete replacement form, and commits header/client/currency/discount/notes/payment terms, all replacement items, and recalculated totals in one transaction. The UI must not chain `updateDraftInvoice()` and `replaceDraftInvoiceItems()`. The targeted update services remain available for narrower internal workflows.
+- The route has no production invoice mutation API. Preview and Issue Invoice controls are disabled. No draft edit UI is included yet; any future edit form must use the atomic `updateFullDraftInvoice()` service rather than chaining separate header and item updates.
 
 ## Secrets and delivery
 

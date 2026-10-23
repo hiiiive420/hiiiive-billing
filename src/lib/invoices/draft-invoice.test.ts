@@ -8,8 +8,10 @@ import {
   createDraftInvoice,
   DraftInvoiceError,
   replaceDraftInvoiceItems,
+  updateFullDraftInvoice,
   updateDraftInvoice,
   type DraftInvoiceItemInput,
+  type UpdateFullDraftInvoiceInput,
 } from "./draft-invoice";
 import { issueInvoice } from "./issue-invoice";
 
@@ -19,6 +21,22 @@ const config = {
 };
 const line = (quantity = "1", unitPrice = "10", extras: { serviceId?: string | null; description?: string; useServiceDefaultPrice?: boolean; position?: number } = {}): DraftInvoiceItemInput => ({
   description: "Service line", quantity, unitPrice, ...extras,
+});
+const fullDraftInput = (
+  clientId: string,
+  overrides: Partial<UpdateFullDraftInvoiceInput> = {},
+): UpdateFullDraftInvoiceInput => ({
+  clientId,
+  projectTitle: null,
+  invoiceDate: null,
+  dueDate: null,
+  currencyCode: "LKR",
+  discountLabel: null,
+  discountAmount: "0",
+  notes: null,
+  paymentTerms: null,
+  items: [line()],
+  ...overrides,
 });
 
 after(async () => { await prisma.$disconnect(); });
@@ -181,6 +199,152 @@ describe("draft invoice service (PostgreSQL integration)", () => {
     await assertNoSequence(organizationId);
   }));
 
+  it("updates the full draft header and replaces quantity, flat-fee, free-text, and service-backed items atomically", async () => withFixture(async ({ organizationId, clientId }) => {
+    const invoice = await createDraftInvoice(organizationId, { clientId, items: [line("1", "10")] });
+    const replacementClient = await prisma.client.create({ data: { organizationId, name: "Replacement client" } });
+    const service = await prisma.service.create({
+      data: { organizationId, name: "Managed service", currencyCode: "CAD", defaultUnitPrice: new Prisma.Decimal("22") },
+    });
+    const matchingService = await prisma.service.create({
+      data: { organizationId, name: "USD service", currencyCode: "USD", defaultUnitPrice: new Prisma.Decimal("22") },
+    });
+    const updated = await updateFullDraftInvoice(organizationId, invoice.id, fullDraftInput(replacementClient.id, {
+      projectTitle: "October campaign",
+      invoiceDate: new Date("2026-10-01T00:00:00.000Z"),
+      dueDate: new Date("2026-10-15T00:00:00.000Z"),
+      currencyCode: "usd",
+      discountLabel: "Launch credit",
+      discountAmount: "1",
+      notes: "Updated note",
+      paymentTerms: "Due in 14 days",
+      items: [
+        { billingMode: "QUANTITY", serviceId: service.id, description: "Explicit service price", quantity: "1.3333", unitPrice: "10.5555", useServiceDefaultPrice: true },
+        { billingMode: "QUANTITY", serviceId: matchingService.id, description: "Requested service default", quantity: "2", useServiceDefaultPrice: true },
+        { billingMode: "FLAT_FEE", serviceId: null, description: "Free-text flat fee", amount: "55000" },
+      ],
+    }));
+    const items = await prisma.invoiceItem.findMany({ where: { organizationId, invoiceId: invoice.id }, orderBy: { position: "asc" } });
+    assert.equal(updated.clientId, replacementClient.id);
+    assert.equal(updated.projectTitle, "October campaign");
+    assert.equal(updated.invoiceDate?.toISOString(), "2026-10-01T00:00:00.000Z");
+    assert.equal(updated.dueDate?.toISOString(), "2026-10-15T00:00:00.000Z");
+    assert.equal(updated.currencyCode, "USD");
+    assert.equal(updated.discountLabel, "Launch credit");
+    assert.equal(updated.discountAmount.toString(), "1");
+    assert.equal(updated.notes, "Updated note");
+    assert.equal(updated.paymentTerms, "Due in 14 days");
+    assert.deepEqual(items.map((item) => item.billingMode), ["QUANTITY", "QUANTITY", "FLAT_FEE"]);
+    assert.deepEqual(items.map((item) => item.serviceId), [service.id, matchingService.id, null]);
+    assert.equal(items[0]!.unitPrice.toString(), "10.5555", "explicit price wins even when the service default currency differs");
+    assert.equal(items[0]!.lineTotal.toString(), "14.0736");
+    assert.equal(items[1]!.unitPrice.toString(), "22");
+    assert.equal(items[1]!.lineTotal.toString(), "44");
+    assert.equal(items[2]!.quantity.toString(), "1");
+    assert.equal(items[2]!.unitPrice.toString(), "55000");
+    assert.equal(items[2]!.lineTotal.toString(), "55000");
+    assert.equal(updated.subtotal.toString(), "55058.0736");
+    assert.equal(updated.grandTotal.toString(), "55057.0736");
+    await assertNoSequence(organizationId);
+  }));
+
+  it("uses matching service defaults and rejects a mismatched default without changing the draft", async () => withFixture(async ({ organizationId, clientId }) => {
+    const invoice = await createDraftInvoice(organizationId, { clientId, projectTitle: "Before", items: [line("2", "3")] });
+    const service = await prisma.service.create({
+      data: { organizationId, name: "USD service", currencyCode: "USD", defaultUnitPrice: new Prisma.Decimal("25") },
+    });
+    const updated = await updateFullDraftInvoice(organizationId, invoice.id, fullDraftInput(clientId, {
+      currencyCode: "usd",
+      items: [{ serviceId: service.id, description: "Defaulted", quantity: "2", useServiceDefaultPrice: true }],
+    }));
+    assert.equal(updated.currencyCode, "USD");
+    assert.equal(updated.subtotal.toString(), "50");
+    const beforeMismatch = await readDraftSnapshot(organizationId, invoice.id);
+    await assert.rejects(updateFullDraftInvoice(organizationId, invoice.id, fullDraftInput(clientId, {
+      projectTitle: "Must roll back",
+      currencyCode: "CAD",
+      items: [{ serviceId: service.id, description: "Wrong currency default", quantity: "1", useServiceDefaultPrice: true }],
+    })), DraftInvoiceError);
+    assert.deepEqual(await readDraftSnapshot(organizationId, invoice.id), beforeMismatch);
+    await assertNoSequence(organizationId);
+  }));
+
+  it("rolls back all header, item, and total changes for invalid items and discounts", async () => withFixture(async ({ organizationId, clientId }) => {
+    const invoice = await createDraftInvoice(organizationId, {
+      clientId, projectTitle: "Original", currencyCode: "LKR", discountLabel: "Original discount", discountAmount: "1",
+      notes: "Original note", paymentTerms: "Original terms", items: [line("2", "10")],
+    });
+    const before = await readDraftSnapshot(organizationId, invoice.id);
+    const changedHeader = { projectTitle: "Changed", currencyCode: "USD", notes: "Changed note" };
+    await assert.rejects(updateFullDraftInvoice(organizationId, invoice.id, fullDraftInput(clientId, {
+      ...changedHeader,
+      items: [line("3", "100"), line("-1", "2")],
+    })), DraftInvoiceError);
+    assert.deepEqual(await readDraftSnapshot(organizationId, invoice.id), before);
+    await assert.rejects(updateFullDraftInvoice(organizationId, invoice.id, fullDraftInput(clientId, {
+      ...changedHeader,
+      discountAmount: "999",
+      items: [line("3", "100")],
+    })), DraftInvoiceError);
+    assert.deepEqual(await readDraftSnapshot(organizationId, invoice.id), before);
+    await assertNoSequence(organizationId);
+  }));
+
+  it("rejects cross-tenant and inactive clients or services atomically", async () => withFixture(async ({ organizationId, clientId, otherOrganizationId, otherClientId }) => {
+    const invoice = await createDraftInvoice(organizationId, { clientId, projectTitle: "Original", items: [line()] });
+    const service = await prisma.service.create({ data: { organizationId, name: "Local service", defaultUnitPrice: new Prisma.Decimal("5") } });
+    const foreignService = await prisma.service.create({ data: { organizationId: otherOrganizationId, name: "Foreign service", defaultUnitPrice: new Prisma.Decimal("5") } });
+    const before = await readDraftSnapshot(organizationId, invoice.id);
+    const replacementItems: DraftInvoiceItemInput[] = [{ serviceId: service.id, description: "New service item", quantity: "1", unitPrice: "5" }];
+    const invalidInputs = [
+      fullDraftInput(otherClientId, { projectTitle: "Changed", items: replacementItems }),
+      fullDraftInput(clientId, { projectTitle: "Changed", items: [{ serviceId: foreignService.id, description: "Foreign", quantity: "1", unitPrice: "5" }] }),
+    ];
+    for (const invalid of invalidInputs) {
+      await assert.rejects(updateFullDraftInvoice(organizationId, invoice.id, invalid), DraftInvoiceError);
+      assert.deepEqual(await readDraftSnapshot(organizationId, invoice.id), before);
+    }
+    await prisma.client.update({ where: { id: clientId }, data: { active: false } });
+    await assert.rejects(updateFullDraftInvoice(organizationId, invoice.id, fullDraftInput(clientId, { projectTitle: "Inactive" })), DraftInvoiceError);
+    await prisma.client.update({ where: { id: clientId }, data: { active: true } });
+    await prisma.service.update({ where: { id: service.id }, data: { active: false } });
+    await assert.rejects(updateFullDraftInvoice(organizationId, invoice.id, fullDraftInput(clientId, {
+      projectTitle: "Inactive service", items: replacementItems,
+    })), DraftInvoiceError);
+    assert.deepEqual(await readDraftSnapshot(organizationId, invoice.id), before);
+    await assert.rejects(updateFullDraftInvoice(otherOrganizationId, invoice.id, fullDraftInput(clientId)), DraftInvoiceError);
+    assert.deepEqual(await readDraftSnapshot(organizationId, invoice.id), before);
+    await assertNoSequence(organizationId);
+  }));
+
+  it("serializes a full draft update against issuance", async () => withFixture(async ({ organizationId, clientId }) => {
+    const invoice = await createDraftInvoice(organizationId, { clientId, projectTitle: "Before", items: [line("1", "10")] });
+    const [editResult, issueResult] = await Promise.allSettled([
+      updateFullDraftInvoice(organizationId, invoice.id, fullDraftInput(clientId, {
+        projectTitle: "After",
+        items: [line("2", "15", { description: "Updated line" })],
+      })),
+      issueInvoice(organizationId, invoice.id),
+    ]);
+    assert.equal(issueResult.status, "fulfilled");
+    const issued = await prisma.invoice.findFirstOrThrow({ where: { organizationId, id: invoice.id } });
+    const items = await prisma.invoiceItem.findMany({ where: { organizationId, invoiceId: invoice.id } });
+    assert.equal(issued.lifecycleStatus, "ISSUED");
+    assert.ok(issued.invoiceNumber);
+    assert.equal(items.length, 1);
+    if (editResult.status === "fulfilled") {
+      assert.equal(issued.projectTitle, "After");
+      assert.equal(items[0]!.description, "Updated line");
+      assert.equal(issued.subtotal.toString(), "30");
+      assert.equal(items[0]!.lineTotal.toString(), "30");
+    } else {
+      assert.ok(editResult.reason instanceof DraftInvoiceError);
+      assert.equal(issued.projectTitle, "Before");
+      assert.equal(items[0]!.description, "Service line");
+      assert.equal(issued.subtotal.toString(), "10");
+      assert.equal(items[0]!.lineTotal.toString(), "10");
+    }
+  }));
+
   it("rejects cross-organization and issued invoice edits", async () => withFixture(async ({ organizationId, clientId, otherOrganizationId, otherClientId }) => {
     const invoice = await createDraftInvoice(organizationId, { clientId, items: [line()] });
     await assert.rejects(updateDraftInvoice(otherOrganizationId, invoice.id, { notes: "wrong tenant" }), DraftInvoiceError);
@@ -188,6 +352,7 @@ describe("draft invoice service (PostgreSQL integration)", () => {
     await issueInvoice(organizationId, invoice.id);
     await assert.rejects(updateDraftInvoice(organizationId, invoice.id, { notes: "after issue" }), DraftInvoiceError);
     await assert.rejects(replaceDraftInvoiceItems(organizationId, invoice.id, [line()]), DraftInvoiceError);
+    await assert.rejects(updateFullDraftInvoice(organizationId, invoice.id, fullDraftInput(clientId, { notes: "after issue" })), DraftInvoiceError);
   }));
 
   it("issueInvoice independently recalculates draft service totals", async () => withFixture(async ({ organizationId, clientId }) => {
@@ -258,4 +423,35 @@ async function cleanup(organizationId: string) {
 async function assertNoSequence(organizationId: string) {
   const sequence = await prisma.invoiceSequence.findUnique({ where: { organizationId_key: { organizationId, key: "DEFAULT" } } });
   assert.equal(sequence, null);
+}
+
+async function readDraftSnapshot(organizationId: string, invoiceId: string) {
+  const invoice = await prisma.invoice.findFirstOrThrow({ where: { organizationId, id: invoiceId } });
+  const items = await prisma.invoiceItem.findMany({
+    where: { organizationId, invoiceId },
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+  });
+  return {
+    clientId: invoice.clientId,
+    projectTitle: invoice.projectTitle,
+    invoiceDate: invoice.invoiceDate?.toISOString() ?? null,
+    dueDate: invoice.dueDate?.toISOString() ?? null,
+    currencyCode: invoice.currencyCode,
+    discountLabel: invoice.discountLabel,
+    discountAmount: invoice.discountAmount.toString(),
+    subtotal: invoice.subtotal.toString(),
+    grandTotal: invoice.grandTotal.toString(),
+    notes: invoice.notes,
+    paymentTerms: invoice.paymentTerms,
+    items: items.map((item) => ({
+      id: item.id,
+      billingMode: item.billingMode,
+      serviceId: item.serviceId,
+      description: item.description,
+      quantity: item.quantity.toString(),
+      unitPrice: item.unitPrice.toString(),
+      lineTotal: item.lineTotal.toString(),
+      position: item.position,
+    })),
+  };
 }
