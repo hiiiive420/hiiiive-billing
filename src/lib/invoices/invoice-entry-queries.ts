@@ -34,6 +34,14 @@ export type InvoiceServiceSearchResult = Readonly<{
 
 export type DraftInvoiceEditReadModel = Readonly<{
   id: string;
+  client: Readonly<{
+    id: string;
+    name: string;
+    billingAddress: string | null;
+    email: string | null;
+    phone: string | null;
+    active: boolean;
+  }>;
   clientId: string;
   projectTitle: string | null;
   invoiceDate: string | null;
@@ -56,6 +64,7 @@ export type DraftInvoiceEditReadModel = Readonly<{
     amount: string | null;
     lineTotal: string;
     position: number;
+    service: InvoiceServiceSearchResult | null;
   }>[];
 }>;
 
@@ -132,10 +141,11 @@ export async function loadDraftInvoiceForEditing(
 ): Promise<DraftInvoiceEditReadModel> {
   const prisma = getPrismaClient();
   const invoice = await prisma.invoice.findFirst({
-    where: { id: invoiceId, organizationId, lifecycleStatus: "DRAFT" },
+    where: { id: invoiceId, organizationId, lifecycleStatus: "DRAFT", invoiceNumber: null, issuedAt: null },
     select: {
       id: true,
       clientId: true,
+      client: { select: { id: true, name: true, billingAddress: true, email: true, phone: true, active: true } },
       projectTitle: true,
       invoiceDate: true,
       dueDate: true,
@@ -157,6 +167,7 @@ export async function loadDraftInvoiceForEditing(
           unitPrice: true,
           lineTotal: true,
           position: true,
+          service: { select: { id: true, name: true, description: true, defaultUnitPrice: true, currencyCode: true } },
         },
         orderBy: [{ position: "asc" }, { id: "asc" }],
       },
@@ -166,6 +177,7 @@ export async function loadDraftInvoiceForEditing(
 
   return {
     id: invoice.id,
+    client: invoice.client,
     clientId: invoice.clientId,
     projectTitle: invoice.projectTitle,
     invoiceDate: formatCalendarDate(invoice.invoiceDate),
@@ -187,6 +199,13 @@ export async function loadDraftInvoiceForEditing(
       amount: item.billingMode === "FLAT_FEE" ? item.unitPrice.toString() : null,
       lineTotal: item.lineTotal.toString(),
       position: item.position,
+      service: item.service ? {
+        id: item.service.id,
+        name: item.service.name,
+        description: item.service.description,
+        defaultUnitPrice: item.service.defaultUnitPrice?.toString() ?? null,
+        currencyCode: normalizeServiceCurrency(item.service.currencyCode),
+      } : null,
     })),
   };
 }

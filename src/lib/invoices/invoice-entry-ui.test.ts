@@ -8,6 +8,7 @@ import {
   itemHasMeaningfulContent,
   devInvoiceEntryAvailable,
   mapDraftItemToEntryState,
+  mapDraftInvoiceToEntryInitialState,
   normalizeMoneyInput,
   parseInvoiceDraftFormPayload,
   resolveServiceDefaultPrice,
@@ -108,6 +109,48 @@ describe("invoice entry form helpers", () => {
     const mapped = mapDraftItemToEntryState({ billingMode: "FLAT_FEE", serviceId: null, description: "Monthly", quantity: "1", unitPrice: "55000", amount: "55000" });
     assert.equal(mapped.billingMode, "FLAT_FEE");
     assert.equal(mapped.amount, "55000");
+  });
+
+  it("maps saved draft values, item modes, service details, positions, and currency deterministically", () => {
+    const initial = mapDraftInvoiceToEntryInitialState({
+      id: "draft-1",
+      client: { id: "client-1", name: "Acme", billingAddress: "1 Main St", email: "billing@acme.test", phone: "555-0100", active: true },
+      projectTitle: "October work",
+      invoiceDate: "2026-10-01",
+      dueDate: "2026-10-15",
+      currencyCode: "USD",
+      discountLabel: "Courtesy",
+      discountAmount: "1234.5678",
+      notes: "Keep exact values",
+      paymentTerms: "14 days",
+      items: [
+        {
+          id: "item-quantity", billingMode: "QUANTITY", serviceId: "service-1", description: "Saved quantity",
+          quantity: "1.3333", unitPrice: "25000.1234", amount: null, position: 4,
+          service: { id: "service-1", name: "Current service", description: null, defaultUnitPrice: "999999.1234", currencyCode: "CAD" },
+        },
+        {
+          id: "item-flat", billingMode: "FLAT_FEE", serviceId: null, description: "Saved flat fee",
+          quantity: "1", unitPrice: "55000", amount: "55000", position: 9, service: null,
+        },
+      ],
+    });
+    assert.equal(initial.clientQuery, "Acme");
+    assert.equal(initial.selectedClient.id, "client-1");
+    assert.equal(initial.projectTitle, "October work");
+    assert.equal(initial.invoiceDate, "2026-10-01");
+    assert.equal(initial.currency, "USD");
+    assert.equal(initial.originalCurrency, "USD");
+    assert.equal(initial.currencyChanged, false);
+    assert.equal(initial.discountAmount, "1234.5678");
+    assert.equal(initial.items[0]?.billingMode, "QUANTITY");
+    assert.equal(initial.items[0]?.unitPrice, "25000.1234");
+    assert.equal(initial.items[0]?.selectedService?.defaultUnitPrice, "999999.1234");
+    assert.equal(initial.items[0]?.useServiceDefaultPrice, false);
+    assert.equal(initial.items[0]?.position, 4);
+    assert.equal(initial.items[1]?.billingMode, "FLAT_FEE");
+    assert.equal(initial.items[1]?.amount, "55000");
+    assert.equal(initial.items[1]?.position, 9);
   });
 
   it("rounds each quantity line to four decimals using ROUND_HALF_UP before subtotal", () => {

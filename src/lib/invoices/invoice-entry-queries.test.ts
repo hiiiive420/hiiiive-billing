@@ -106,6 +106,9 @@ describe("invoice entry read queries (PostgreSQL integration)", () => {
     const beforeTemplateCount = await prisma.invoiceTemplate.count({ where: { organizationId } });
 
     const model = await loadDraftInvoiceForEditing(organizationId, invoice.id);
+    assert.equal(model.client.id, clientId);
+    assert.equal(model.client.name, "Fixture Client");
+    assert.equal(model.client.active, true);
     assert.equal(model.clientId, clientId);
     assert.equal(model.projectTitle, "Read model project");
     assert.equal(model.invoiceDate, "2026-10-10");
@@ -142,6 +145,26 @@ describe("invoice entry read queries (PostgreSQL integration)", () => {
     const model = await loadDraftInvoiceForEditing(organizationId, invoice.id);
     assert.equal(model.items[0]?.billingMode, "FLAT_FEE");
     assert.equal(model.items[0]?.amount, "55000");
+  }));
+
+  it("returns saved service details without replacing the draft's explicit item price", async () => withFixture(async ({ organizationId, clientId }) => {
+    const service = await prisma.service.create({
+      data: { organizationId, name: "Current service", description: "Current description", defaultUnitPrice: new Prisma.Decimal("999999.1234"), currencyCode: "CAD" },
+    });
+    const invoice = await createDraftInvoice(organizationId, {
+      clientId, currencyCode: "USD",
+      items: [{ serviceId: service.id, description: "Saved description", quantity: "2", unitPrice: "25000" }],
+    });
+    const model = await loadDraftInvoiceForEditing(organizationId, invoice.id);
+    assert.deepEqual(model.items[0]?.service, {
+      id: service.id,
+      name: "Current service",
+      description: "Current description",
+      defaultUnitPrice: "999999.1234",
+      currencyCode: "CAD",
+    });
+    assert.equal(model.items[0]?.unitPrice, "25000");
+    assert.equal(model.items[0]?.description, "Saved description");
   }));
 
   it("rejects cross-organization and issued invoices from the draft editor read model", async () => withFixture(async ({ organizationId, otherOrganizationId, clientId }) => {

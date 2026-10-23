@@ -180,3 +180,35 @@ Added server-only `updateFullDraftInvoice(organizationId, invoiceId, input)` for
 ## Blockers
 
 None known.
+
+---
+
+# Task ID: INV-019 — Saved Draft Edit UI
+
+- **Status:** Complete
+
+## Summary
+
+Added the development-only `/dev/invoices/[invoiceId]/edit` route and reused the existing invoice-entry form for create and edit workflows. The route loads only a tenant-owned, unissued DRAFT. The form restores saved header values and deterministically ordered items, then saves the complete form through `updateFullDraftInvoice()`.
+
+Create mode retains its existing save behavior and now links the created draft to its edit route. Edit mode remains editable after a successful save and displays a save confirmation.
+
+## Restore and save behavior
+
+- The draft read model returns the selected client's display details plus each item's current service details for informational display.
+- Saved quantity, unit price, flat amount, billing mode, item order, and original currency are mapped directly from exact persisted strings. Existing saved prices stay authoritative; service defaults are not applied when reopening.
+- Edit Server Actions independently block production, resolve the fixed development organization on the server, whitelist editable form data, and call the atomic full-draft update service. Client-supplied tenant IDs and persisted totals are ignored.
+- Preview and Issue Invoice remain disabled. No migration was required.
+
+## Tests and checks
+
+- Added coverage for edit-state mapping, exact money strings, original currency warning state, saved service price preservation, client/service display data, DRAFT-only loading, and existing atomic update protections.
+- `npm test` — passed, 112 unit/integration tests and 8 PDF tests.
+- `npm run typecheck` — passed.
+- `npm run lint` — passed.
+- `npm run build` — passed; includes `/dev/invoices/[invoiceId]/edit`.
+- `npm run db:migrate:status` — passed; all 10 migrations are applied. No migration was needed.
+
+## Blockers
+
+None known.

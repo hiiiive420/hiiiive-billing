@@ -100,6 +100,8 @@
 .entry-success { display: flex; align-items: center; gap: 8px; border-color: #cfe5d9; color: #315f49; background: #f3faf5; }
 .entry-success code { font-size: 11px; }
 .entry-success button { margin-left: auto; border: 0; color: #347467; background: transparent; font: inherit; font-weight: 600; cursor: pointer; }
+.entry-success a { margin-left: auto; color: #347467; font-weight: 600; text-decoration: none; }
+.entry-success a:hover { text-decoration: underline; }
 .entry-inline-error { color: #a14338 !important; }
 .entry-page button:focus-visible, .entry-page input:focus-visible, .entry-page select:focus-visible, .entry-page textarea:focus-visible { outline: 3px solid #55968666; outline-offset: 2px; }
 
@@ -140,5 +142,6 @@
   .entry-item-row input { min-height: 43px; }
   .entry-footer { flex-direction: column; gap: 3px; }
   .entry-success { flex-wrap: wrap; }
+  .entry-success a { width: 100%; margin: 3px 0 0; }
   .entry-success button { width: 100%; margin: 3px 0 0; text-align: left; }
 }

@@ -18,6 +18,63 @@ export type InvoiceEntryItemState = {
   useServiceDefaultPrice: boolean;
 };
 
+export type InvoiceEntryClientDisplay = Readonly<{
+  id: string;
+  name: string;
+  billingAddress: string | null;
+  email: string | null;
+  phone: string | null;
+  active: boolean;
+}>;
+
+export type InvoiceEntryServiceDisplay = Readonly<{
+  id: string;
+  name: string;
+  description: string | null;
+  defaultUnitPrice: string | null;
+  currencyCode: string;
+}>;
+
+export type InvoiceEntryDraftData = Readonly<{
+  id: string;
+  client: InvoiceEntryClientDisplay;
+  projectTitle: string | null;
+  invoiceDate: string | null;
+  dueDate: string | null;
+  currencyCode: string;
+  discountLabel: string | null;
+  discountAmount: string;
+  notes: string | null;
+  paymentTerms: string | null;
+  items: readonly Readonly<{
+    id: string;
+    billingMode: "QUANTITY" | "FLAT_FEE";
+    serviceId: string | null;
+    description: string;
+    quantity: string;
+    unitPrice: string;
+    amount: string | null;
+    position: number;
+    service: InvoiceEntryServiceDisplay | null;
+  }>[];
+}>;
+
+export type InvoiceEntryDraftInitialState = Readonly<{
+  clientQuery: string;
+  selectedClient: InvoiceEntryClientDisplay;
+  projectTitle: string;
+  invoiceDate: string;
+  dueDate: string;
+  currency: string;
+  originalCurrency: string;
+  currencyChanged: false;
+  paymentTerms: string;
+  discountLabel: string;
+  discountAmount: string;
+  notes: string;
+  items: readonly (InvoiceEntryItemState & { key: string; position: number; serviceQuery: string; selectedService: InvoiceEntryServiceDisplay | null })[];
+}>;
+
 export const DEFAULT_INVOICE_BILLING_MODE = "QUANTITY" as const;
 
 export type InvoiceDraftFormPayload = {
@@ -106,6 +163,31 @@ export function mapDraftItemToEntryState(item: {
     unitPrice: item.unitPrice,
     amount: billingMode === "FLAT_FEE" ? item.amount ?? item.unitPrice : item.amount ?? "",
     useServiceDefaultPrice: false,
+  };
+}
+
+/** Map persisted decimal strings and saved service details directly into deterministic edit-form state. */
+export function mapDraftInvoiceToEntryInitialState(draft: InvoiceEntryDraftData): InvoiceEntryDraftInitialState {
+  return {
+    clientQuery: draft.client.name,
+    selectedClient: draft.client,
+    projectTitle: draft.projectTitle ?? "",
+    invoiceDate: draft.invoiceDate ?? "",
+    dueDate: draft.dueDate ?? "",
+    currency: draft.currencyCode,
+    originalCurrency: draft.currencyCode,
+    currencyChanged: false,
+    paymentTerms: draft.paymentTerms ?? "",
+    discountLabel: draft.discountLabel ?? "",
+    discountAmount: draft.discountAmount,
+    notes: draft.notes ?? "",
+    items: draft.items.map((item) => ({
+      ...mapDraftItemToEntryState(item),
+      key: `draft-${item.id}`,
+      position: item.position,
+      serviceQuery: item.service?.name ?? "",
+      selectedService: item.service,
+    })),
   };
 }
 
