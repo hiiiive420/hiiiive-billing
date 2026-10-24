@@ -10,6 +10,7 @@ export const PERMISSIONS = [
   "INVOICE_CREATE",
   "INVOICE_EDIT_DRAFT",
   "INVOICE_ISSUE",
+  "INVOICE_SEND",
   "PAYMENT_READ",
   "PAYMENT_RECORD",
   "USER_ADMIN",
@@ -25,7 +26,7 @@ export type CurrentMembership = Pick<OrganizationMembership, "id" | "organizatio
 const ROLE_PERMISSIONS: Readonly<Record<OrganizationRole, readonly Permission[]>> = {
   [OrganizationRole.ADMIN]: PERMISSIONS,
   [OrganizationRole.BILLING]: [
-    "INVOICE_READ", "INVOICE_CREATE", "INVOICE_EDIT_DRAFT", "INVOICE_ISSUE", "PAYMENT_READ", "PAYMENT_RECORD",
+    "INVOICE_READ", "INVOICE_CREATE", "INVOICE_EDIT_DRAFT", "INVOICE_ISSUE", "INVOICE_SEND", "PAYMENT_READ", "PAYMENT_RECORD",
   ],
   [OrganizationRole.VIEWER]: ["INVOICE_READ", "PAYMENT_READ"],
 };
@@ -126,6 +127,7 @@ export async function requireOrganizationBySlug(slug: string, permission: Permis
     organizationName: membership.organization.name,
     userId: membership.userId,
     userLabel: user.displayName ?? user.email,
+    userEmail: user.email,
     role: membership.role,
   };
 }

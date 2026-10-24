@@ -117,6 +117,22 @@
 .entry-inline-error { color: #a14338 !important; }
 .entry-page button:focus-visible, .entry-page input:focus-visible, .entry-page select:focus-visible, .entry-page textarea:focus-visible { outline: 3px solid #55968666; outline-offset: 2px; }
 
+.email-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); align-items: start; gap: 18px; max-width: 1120px; margin: 0 auto; }
+.email-compose { display: grid; gap: 15px; }
+.email-compose textarea { resize: vertical; }
+.email-attachment { display: grid; gap: 4px; border: 1px solid #e3e9e8; border-radius: 8px; padding: 12px 14px; color: #718084; font-size: 12px; }
+.email-attachment strong { color: #34464a; font-size: 13px; overflow-wrap: anywhere; }
+.email-attachment small { color: #879598; }
+.email-form-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.email-history { position: sticky; top: 18px; }
+.email-history ol { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.email-history li { display: grid; gap: 4px; border-top: 1px solid #edf0ef; padding-top: 11px; color: #718084; font-size: 12px; overflow-wrap: anywhere; }
+.email-history li > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #899698; font-size: 11px; }
+.email-history-status { font-size: 11px; letter-spacing: .04em; }
+.email-history-sent { color: #2f7455; }
+.email-history-failed { color: #a14338; }
+.email-history-pending { color: #896522; }
+
 @media (max-width: 1060px) {
   .entry-layout { grid-template-columns: minmax(0, 1fr) 280px; gap: 15px; }
   .entry-item-row { grid-template-columns: minmax(180px, 2fr) minmax(65px, .65fr) minmax(95px, 1fr) minmax(90px, .9fr) 96px; gap: 8px; }
@@ -128,6 +144,8 @@
   .entry-actions { width: 100%; }
   .entry-actions .entry-button { flex: 1; padding-inline: 9px; }
   .entry-layout { grid-template-columns: 1fr; }
+  .email-layout { grid-template-columns: 1fr; }
+  .email-history { position: static; }
   .entry-summary { position: static; }
   .entry-item-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; border: 1px solid #e6eceb; border-radius: 9px; margin: 0 0 12px; padding: 15px; }
   .entry-item-row-flat { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -156,6 +174,8 @@
   .entry-item-row input { min-height: 43px; }
   .entry-footer { flex-direction: column; gap: 3px; }
   .entry-success { flex-wrap: wrap; }
+  .email-form-actions { flex-direction: column-reverse; }
+  .email-form-actions .entry-button { width: 100%; }
   .entry-success a { width: 100%; margin: 3px 0 0; }
   .entry-success button { width: 100%; margin: 3px 0 0; text-align: left; }
 }

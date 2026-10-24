@@ -4,7 +4,7 @@
 
 Local development uses the locally installed PostgreSQL server at `localhost:5432`. The database name is `hiiiive_billing`; connection details are kept in the ignored local `.env` file and are not documented here. Production database strategy remains undecided until deployment.
 
-The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), payments/reworked invoice relations (`add_payments_and_invoice_relations`), replacement lineage enforcement (`enforce_replacement_lineage`), invoice template versioning (`add_invoice_template_versioning`), template version immutability (`enforce_template_version_immutability`), optional invoice project titles (`add_invoice_project_title`), template selection/freeze enforcement (`freeze_invoice_template_at_issuance`), and `20261023060949_add_invoice_item_billing_mode`, which adds the `InvoiceItemBillingMode` enum and a non-null `billingMode` column defaulting to `QUANTITY`. This migration leaves existing financial values unchanged. Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
+The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), payments/reworked invoice relations (`add_payments_and_invoice_relations`), replacement lineage enforcement (`enforce_replacement_lineage`), invoice template versioning (`add_invoice_template_versioning`), template version immutability (`enforce_template_version_immutability`), optional invoice project titles (`add_invoice_project_title`), template selection/freeze enforcement (`freeze_invoice_template_at_issuance`), and `20261023060949_add_invoice_item_billing_mode`, which adds the `InvoiceItemBillingMode` enum and a non-null `billingMode` column defaulting to `QUANTITY` without changing existing financial values. `20261023181221_add_invoice_email_attempts` adds the tenant-scoped email-attempt audit table and status enum. `20261023183000_guard_invoice_email_attempt_immutability` adds terminal-state checks and a trigger protecting audit snapshots. Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
 
 ## Implemented Prisma models
 
@@ -88,6 +88,12 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 - A composite FK `(organizationId, invoiceId)` enforces tenant matching with Invoice. Deletion is restricted. Multiple payment rows per invoice are supported.
 - The server-only payment service inserts a payment and recalculates `Invoice.paymentStatus` from the recorded amount total under a transaction and invoice row lock. It does not change `grandTotal`. Overpayments remain recorded and marked PAID; refunds and credit handling are not implemented.
 
+### InvoiceEmailAttempt
+
+- Stores one tenant-scoped snapshot per issued-invoice email send or resend: requester membership/email, configured sender, To/CC/BCC arrays, subject, and plain-text body. Each attempt has `PENDING`, `SENT`, or `FAILED` status, optional provider message ID, safe failure details, and lifecycle timestamps.
+- Composite foreign keys require both the invoice and requester membership to belong to `organizationId`. Indexes support recent invoice attempt history and requester history.
+- `PENDING` may transition once to a terminal state. A PostgreSQL check constraint enforces status/timestamp consistency; a trigger rejects deletion, snapshot edits, and all terminal-row mutation. Resends create new rows. SMTP runs outside transactions; this table does not mutate the invoice or payment state.
+
 ### InvoiceRelation
 
 - Organization-scoped historical relation with source and target invoice IDs, `InvoiceRelationType` (`REPLACED_BY`), reason, and creation timestamp.
@@ -122,10 +128,9 @@ The following entities and relationships remain design guidance only; they are n
 - **Invoice** â€” organization/client-owned financial snapshot with draft/issued lifecycle.
 - **Recurring invoice template** â€” organization/client-owned source for idempotently generated drafts.
 - **Approval** â€” records internal approval before an invoice can be sent.
-- **Email send attempt** â€” logs retryable delivery attempts for an approved and issued invoice.
 - **Audit event** â€” immutable record of important actions, actor, timestamp, action, and relevant reason/metadata.
 
-These future entities must follow the business and security requirements in `BUSINESS-RULES.md` and `SECURITY.md`. Their exact persistence and accounting treatment remain future implementation decisions. Approval, audit events, recurring templates, and email attempts are not implemented.
+These future entities must follow the business and security requirements in `BUSINESS-RULES.md` and `SECURITY.md`. Their exact persistence and accounting treatment remain future implementation decisions. Approval, generalized audit events, and recurring templates are not implemented. Email send attempts are implemented by `InvoiceEmailAttempt`.
 
 
 

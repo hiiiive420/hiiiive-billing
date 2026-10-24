@@ -13,6 +13,7 @@ import {
   searchEditServicesAction,
   updateOrganizationDraftAction,
 } from "@/app/app/[organizationSlug]/invoices/actions";
+import { sendOrganizationInvoiceEmailAction } from "@/app/app/[organizationSlug]/invoices/[invoiceId]/send/actions";
 
 const prisma = getPrismaClient();
 after(async () => { await prisma.$disconnect(); });
@@ -43,6 +44,11 @@ describe("production invoice Server Actions (PostgreSQL integration)", () => {
       if (ownClients.ok) assert.deepEqual(ownClients.results.map((row) => row.name), ["Allowed Client"]);
       assert.equal((await searchCreateClientsAction(foreignOrg.slug, "Foreign")).ok, false);
       assert.equal((await searchEditServicesAction(org.slug, "Explicit")).ok, true);
+      const billingSendDraft = await sendOrganizationInvoiceEmailAction(org.slug, randomUUID(), {
+        to: "recipient@example.test", subject: "Invoice", bodyText: "Please review.",
+      });
+      assert.equal(billingSendDraft.ok, false);
+      if (!billingSendDraft.ok) assert.match(billingSendDraft.error, /only issued invoices/i);
 
       const created = await createOrganizationDraftAction(org.slug, {
         organizationId: foreignOrg.id,
@@ -137,6 +143,11 @@ describe("production invoice Server Actions (PostgreSQL integration)", () => {
       const viewerIssue = await issueOrganizationInvoiceAction(org.slug, created.invoiceId);
       assert.equal(viewerIssue.ok, false);
       if (!viewerIssue.ok) assert.match(viewerIssue.error, /permission/i);
+      const viewerSend = await sendOrganizationInvoiceEmailAction(org.slug, created.invoiceId, {
+        to: "recipient@example.test", subject: "Invoice", bodyText: "Please review.",
+      });
+      assert.equal(viewerSend.ok, false);
+      if (!viewerSend.ok) assert.match(viewerSend.error, /permission/i);
       assert.equal((await loadDraftInvoiceForEditing(org.id, created.invoiceId)).id, created.invoiceId);
 
       await prisma.organizationMembership.updateMany({ where: { organizationId: org.id, userId: user.id }, data: { active: false } });

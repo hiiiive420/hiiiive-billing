@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createElement } from "react";
 import { notFound } from "next/navigation";
-import { AuthorizationError, OrganizationContextNotFoundError, requireOrganizationBySlug } from "@/lib/auth/authorization";
+import { AuthorizationError, hasPermission, OrganizationContextNotFoundError, requireOrganizationBySlug } from "@/lib/auth/authorization";
 import { loadIssuedInvoiceDocument, IssuedInvoiceDocumentError } from "@/lib/invoices/issued-invoice-document";
 import { resolveInvoiceRenderer } from "@/lib/invoice-templates/registry";
 import { InvoicePreviewScale } from "@/app/dev/invoice-preview/invoice-preview-scale";
@@ -26,7 +26,7 @@ export default async function IssuedInvoicePage({ params }: { params: Promise<{ 
   const basePath = `/app/${encodeURIComponent(workspace.organizationSlug)}/invoices/${encodeURIComponent(invoiceId)}`;
   return <main className="preview-shell">
     <div className="preview-banner"><strong>{document.invoice.invoiceNumber}</strong> | {document.lifecycleStatus.replaceAll("_", " ")} | {document.paymentStatus.replaceAll("_", " ")}
-      <div className="document-actions"><Link className="entry-button entry-button-light" href={`${basePath}/pdf`} download>Download PDF</Link></div>
+      <div className="document-actions"><Link className="entry-button entry-button-light" href={`${basePath}/pdf`} download>Download PDF</Link>{document.lifecycleStatus === "ISSUED" && hasPermission(workspace.role, "INVOICE_SEND") && <Link className="entry-button entry-button-primary" href={`${basePath}/send`}>Send Invoice</Link>}</div>
     </div>
     <InvoicePreviewScale>{invoiceDocument}</InvoicePreviewScale>
   </main>;

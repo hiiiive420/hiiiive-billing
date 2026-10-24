@@ -25,6 +25,17 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - An issued invoice may be Paid, Partially Paid, Superseded/Reworked, Void, or Written Off where an authorized process permits it.
 - Preserve the original invoice and its audit history when it is superseded, voided, or written off. Record the reason and relevant actor.
 
+## Issued invoice email
+
+- Issuing an invoice does not send email. Email sending is a separate authorized human action after issuance.
+- Email can be sent only for an `ISSUED` invoice and by an organization member authorized for `INVOICE_SEND` (`ADMIN` or `BILLING`). Sending does not issue, edit, supersede, or change payment state.
+- The suggested recipient is the frozen `clientEmailSnapshot`; do not fall back to the current Client email. The user may edit recipients for an individual send. No recipient profile is persisted.
+- To is required. To/CC/BCC accept comma, semicolon, or newline separators, normalize addresses to lowercase, deduplicate within each category, validate server-side, and allow at most 50 total recipients. The configured sender is server-only and cannot be overridden by form input. BCC is never included in To/CC headers or client-visible history.
+- Subject and body are editable for each attempt. Defaults use the issued invoice's trusted frozen details; absent due date or payment terms are omitted. Subject line breaks are rejected.
+- Every send and retry creates its own immutable recipient/content/actor snapshot. Attempts transition once from `PENDING` to `SENT` or `FAILED`. PDF generation and SMTP happen outside a database transaction; failures do not alter invoice, payment, or numbering state. A retry creates a new attempt.
+- Attach only the official server-generated issued PDF. SMTP configuration and credentials come from server environment variables; if sender or SMTP settings are missing/invalid, sending fails safely.
+- Permanent per-client To/CC/BCC defaults are a future enhancement; recipients are selected per send.
+
 ## Invoice currency
 
 - `Invoice.currencyCode` is authoritative for the amounts on that invoice. Draft invoices default to `LKR` and may change currency while they remain DRAFT.

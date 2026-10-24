@@ -25,7 +25,7 @@ describe("organization authorization (PostgreSQL integration)", () => {
   it("enforces the complete role matrix and denies unknown roles", () => {
     const expected: Record<string, readonly string[]> = {
       ADMIN: PERMISSIONS,
-      BILLING: ["INVOICE_READ", "INVOICE_CREATE", "INVOICE_EDIT_DRAFT", "INVOICE_ISSUE", "PAYMENT_READ", "PAYMENT_RECORD"],
+      BILLING: ["INVOICE_READ", "INVOICE_CREATE", "INVOICE_EDIT_DRAFT", "INVOICE_ISSUE", "INVOICE_SEND", "PAYMENT_READ", "PAYMENT_RECORD"],
       VIEWER: ["INVOICE_READ", "PAYMENT_READ"],
     };
     for (const role of [OrganizationRole.ADMIN, OrganizationRole.BILLING, OrganizationRole.VIEWER]) {

@@ -45,6 +45,13 @@ enum InvoiceRelationType {
   REPLACED_BY
 }
 
+enum InvoiceEmailAttemptStatus {
+  PENDING
+  SENT
+  PARTIALLY_SENT
+  FAILED
+}
+
 model Organization {
   id                      String                   @id @default(uuid()) @db.Uuid
   name                    String
@@ -62,6 +69,7 @@ model Organization {
   invoiceRelations        InvoiceRelation[]
   invoiceTemplates        InvoiceTemplate[]
   invoiceTemplateVersions InvoiceTemplateVersion[]
+  invoiceEmailAttempts    InvoiceEmailAttempt[]
 }
 
 model User {
@@ -75,15 +83,16 @@ model User {
 }
 
 model OrganizationMembership {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizationId String           @db.Uuid
-  userId         String           @db.Uuid
-  role           OrganizationRole
-  active         Boolean          @default(true)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  id                   String                @id @default(uuid()) @db.Uuid
+  organizationId       String                @db.Uuid
+  userId               String                @db.Uuid
+  role                 OrganizationRole
+  active               Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  invoiceEmailAttempts InvoiceEmailAttempt[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, userId])
   @@index([organizationId, role])
@@ -179,6 +188,7 @@ model Invoice {
   sourceRelations              InvoiceRelation[]       @relation("InvoiceRelationSource")
   targetRelations              InvoiceRelation[]       @relation("InvoiceRelationTarget")
   templateVersion              InvoiceTemplateVersion? @relation(fields: [organizationId, templateVersionId], references: [organizationId, id], onDelete: Restrict)
+  emailAttempts                InvoiceEmailAttempt[]
 
   // Enables tenant-safe composite foreign keys from invoice items.
   @@unique([organizationId, id])
@@ -294,4 +304,34 @@ model InvoiceTemplateVersion {
   @@unique([organizationId, id])
   @@unique([organizationId, templateId, version])
   @@index([organizationId, templateId])
+}
+
+model InvoiceEmailAttempt {
+  id                       String                    @id @default(uuid()) @db.Uuid
+  organizationId           String                    @db.Uuid
+  invoiceId                String                    @db.Uuid
+  requestedByUserId        String                    @db.Uuid
+  requestedByEmailSnapshot String
+  fromEmail                String
+  fromName                 String
+  toRecipients             String[]
+  ccRecipients             String[]                  @default([])
+  bccRecipients            String[]                  @default([])
+  acceptedRecipients       String[]                  @default([])
+  rejectedRecipients       String[]                  @default([])
+  subject                  String
+  bodyText                 String
+  status                   InvoiceEmailAttemptStatus @default(PENDING)
+  providerMessageId        String?
+  failureCode              String?
+  safeFailureMessage       String?
+  createdAt                DateTime                  @default(now())
+  sentAt                   DateTime?
+  failedAt                 DateTime?
+  organization             Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoice                  Invoice                   @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Restrict)
+  requesterMembership      OrganizationMembership    @relation(fields: [organizationId, requestedByUserId], references: [organizationId, userId], onDelete: Restrict)
+
+  @@index([organizationId, invoiceId, createdAt])
+  @@index([organizationId, requestedByUserId, createdAt])
 }

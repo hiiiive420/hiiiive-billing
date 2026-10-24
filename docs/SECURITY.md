@@ -80,6 +80,14 @@ Outside production, `DEV_AUTH_EMAIL` provides a deliberately explicit server-onl
 - Send client invoice email only after server-side confirmation that the invoice is approved and issued.
 - Log email attempts and support retries without duplicating invoice creation.
 
+### Issued invoice email
+
+- Production send pages and Server Actions resolve the organization from the authenticated membership and require `INVOICE_SEND`. ADMIN and BILLING may send; VIEWER may not. Only `ISSUED` invoices are eligible.
+- SMTP host, port, secure mode, credentials, and sender identity are server environment configuration. `SMTP_SECURE` is parsed explicitly as `true`/`false`; sender identity is required and is never accepted from client input. SMTP is initialized only when a send is attempted, so build and tests do not need real credentials.
+- Recipient input is parsed and validated on the server. To is required; the combined recipient count is capped at 50. Address categories are normalized/deduplicated independently. BCC is stored in the private audit snapshot and SMTP envelope, not in To/CC message headers, generated message content, or the client-visible attempt list.
+- The compose route uses only the frozen client email snapshot as its suggested To value. The official issued PDF is generated from the trusted frozen document loader and attached in memory; no client file or path is accepted.
+- A `PENDING` audit snapshot is persisted before PDF generation and SMTP. SMTP runs outside database transactions. The row can transition once to `SENT` or `FAILED`; PostgreSQL rejects deletion, terminal mutation, and snapshot rewrites. Failure messages returned to the browser and persisted for display are fixed safe text and never include SMTP credentials/provider internals. A resend creates a new audit row.
+
 ## Audit trail
 
 Record immutable audit events for important invoice actions, including actor, timestamp, action, and relevant reason or metadata. Restrict access to internal notes and operational details to authorized users.
