@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { IssueInvoiceControl } from "./issue-invoice-control";
+import { InvoiceIntentQuickEntry } from "./invoice-intent-quick-entry";
 import {
   calculateInvoicePreview,
   DEFAULT_INVOICE_BILLING_MODE,
@@ -20,6 +21,8 @@ import {
   type InvoiceEntryDraftData,
   type InvoiceEntryServiceDisplay,
 } from "@/lib/invoices/invoice-entry-ui";
+import { mapInvoiceIntentSuggestionToForm } from "@/lib/invoices/invoice-intent-form";
+import type { InvoiceIntentSuggestion } from "@/lib/ai/invoice-intent-contract";
 
 type Client = { id: string; name: string; billingAddress: string | null; email: string | null; phone: string | null; active?: boolean };
 type Service = InvoiceEntryServiceDisplay;
@@ -32,6 +35,7 @@ export type InvoiceEntryFormActions = {
   saveDraft?: (value: unknown) => Promise<ActionResult<{ invoiceId: string }>>;
   saveDraftChanges?: (invoiceId: string, value: unknown) => Promise<ActionResult>;
   issueInvoice?: () => Promise<{ ok: true; invoiceId: string; invoiceNumber: string } | { ok: false; error: string }>;
+  generateIntent?: (text: string) => Promise<import("@/lib/ai/invoice-intent-contract").InvoiceIntentActionResult>;
 };
 export type InvoiceEntryPresentation = {
   mode: "development" | "production";
@@ -128,6 +132,35 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
     setSavedInvoiceId(""); setFormError("");
   }
 
+  function applyInvoiceIntent(suggestion: InvoiceIntentSuggestion) {
+    const patch = mapInvoiceIntentSuggestionToForm(suggestion, currentColomboDate());
+    setClientQuery(patch.clientQuery);
+    setClients(patch.selectedClient ? [patch.selectedClient] : []);
+    setSelectedClient(patch.selectedClient);
+    setClientError("");
+    setProjectTitle(patch.projectTitle);
+    setInvoiceDate(patch.invoiceDate);
+    setDueDate(patch.dueDate);
+    setCurrency(patch.currency);
+    setOriginalCurrency("LKR");
+    setCurrencyChanged(patch.currency !== "LKR");
+    setPaymentTerms(patch.paymentTerms);
+    setItems(patch.items.map((item) => ({ ...item })));
+    nextItemKey.current = patch.items.length;
+    setDiscountLabel(patch.discountLabel);
+    setDiscountAmount(patch.discountAmount);
+    setNotes(patch.notes);
+    setFormDirty(true);
+    setFormError("");
+    setEditSaved(false);
+  }
+
+  const hasExistingFormData = Boolean(
+    selectedClient || clientQuery.trim() || projectTitle.trim() || invoiceDate || dueDate ||
+    currency !== "LKR" || paymentTerms.trim() || notes.trim() || discountLabel.trim() || discountAmount !== "0" ||
+    items.some((item) => itemHasMeaningfulContent(item) || item.quantity !== "1"),
+  );
+
   return (
     <main className={`entry-page${presentation.mode === "production" ? " entry-page-production" : ""}`} onChange={() => setFormDirty(true)}>
       {presentation.mode === "development" ? <div className="entry-dev-banner"><span className="entry-dev-dot" /> Development Invoice Entry <span>Development data only</span></div> : <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><span>{presentation.organizationName}</span>{presentation.userLabel && <span className="entry-workspace-user">{presentation.userLabel}{presentation.role ? ` · ${presentation.role}` : ""}</span>}</div>}
@@ -144,6 +177,12 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
       {savedInvoiceId && <div className="entry-success" role="status"><strong>Draft saved.</strong>{presentation.mode === "development" && <> Draft ID: <code>{savedInvoiceId}</code></>}<a href={`${presentation.editBasePath}/${savedInvoiceId}/edit`}>Continue editing draft</a>{presentation.mode === "development" && <button type="button" onClick={startAnotherDraft}>Create another draft</button>}</div>}
       {editSaved && <div className="entry-success" role="status"><strong>Draft changes saved.</strong> Continue editing and save again when ready.</div>}
       {formError && <div className="entry-error" role="alert">{formError}</div>}
+
+      {presentation.mode === "production" && !editing && !savedInvoiceId && actions.generateIntent && <InvoiceIntentQuickEntry
+        generate={actions.generateIntent}
+        hasExistingData={hasExistingFormData}
+        onApply={applyInvoiceIntent}
+      />}
 
       <div className="entry-layout">
         <div className="entry-main-column">
@@ -198,6 +237,14 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
       <footer className="entry-footer">{presentation.mode === "development" && <span>Development entry only</span>}<span>Invoice totals are confirmed by the server on save.</span></footer>
     </main>
   );
+}
+
+function currentColomboDate(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Colombo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function InvoiceItemRow({ item, index, count, currency, disabled, searchServices, onChange, onRemove, onMove, amount }: {

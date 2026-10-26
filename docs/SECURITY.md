@@ -88,6 +88,14 @@ Outside production, `DEV_AUTH_EMAIL` provides a deliberately explicit server-onl
 - The compose route uses only the frozen client email snapshot as its suggested To value. The official issued PDF is generated from the trusted frozen document loader and attached in memory; no client file or path is accepted.
 - A `PENDING` audit snapshot is persisted before PDF generation and SMTP. SMTP runs outside database transactions. The row can transition once to `SENT` or `FAILED`; PostgreSQL rejects deletion, terminal mutation, and snapshot rewrites. Failure messages returned to the browser and persisted for display are fixed safe text and never include SMTP credentials/provider internals. A resend creates a new audit row.
 
+### AI invoice suggestions
+
+- Quick Invoice parsing is available only through a Server Action that authenticates the request, resolves the URL slug through the user's active membership, and requires `INVOICE_CREATE` before calling OpenAI. Viewer and foreign-organization requests are denied before the parser runs.
+- Browser input contains only the natural-language text. Organization, user, role, model, API key, client IDs, and service IDs are server-derived or never accepted. Input is text-only and capped at 2,000 characters.
+- The OpenAI request includes no JWT, user email, organization UUID, database identifiers, client/service lists, invoices, payments, or SMTP data. It uses `store: false`, stateless Responses structured output, a strict schema, no tools, no web search, and no retries. The API key stays in server environment configuration.
+- Suggestions and natural-language text are transient and are not written to the database. Tenant-scoped exact unique matching reads only active records in the authorized organization; ambiguous or absent matches are not guessed. Returned data is limited to fields needed by the form.
+- AI output cannot mutate invoices or financial data. The UI keeps the suggestion separate until explicit user Apply; normal server validation and Save Draft remain authoritative. Errors are replaced with a fixed safe fallback and the ordinary invoice form remains usable.
+
 ## Audit trail
 
 Record immutable audit events for important invoice actions, including actor, timestamp, action, and relevant reason or metadata. Restrict access to internal notes and operational details to authorized users.

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { InvoiceEntryForm } from "@/components/invoices/invoice-entry-form";
 import { requireOrganizationBySlug, OrganizationContextNotFoundError, AuthorizationError, ProvisioningError } from "@/lib/auth/authorization";
 import { AuthenticationError } from "@/lib/auth/identity";
-import { createOrganizationDraftAction, searchCreateClientsAction, searchCreateServicesAction } from "../actions";
+import { createOrganizationDraftAction, generateInvoiceIntentAction, searchCreateClientsAction, searchCreateServicesAction } from "../actions";
 
 export default async function NewOrganizationInvoicePage({ params }: { params: Promise<{ organizationSlug: string }> }) {
   const { organizationSlug } = await params;
@@ -16,9 +16,10 @@ export default async function NewOrganizationInvoicePage({ params }: { params: P
   const searchClients = searchCreateClientsAction.bind(null, workspace.organizationSlug);
   const searchServices = searchCreateServicesAction.bind(null, workspace.organizationSlug);
   const saveDraft = createOrganizationDraftAction.bind(null, workspace.organizationSlug);
+  const generateIntent = generateInvoiceIntentAction.bind(null, workspace.organizationSlug);
 
   return <InvoiceEntryForm
-    actions={{ searchClients, searchServices, saveDraft }}
+    actions={{ searchClients, searchServices, saveDraft, generateIntent }}
     presentation={{
       mode: "production",
       organizationName: workspace.organizationName,

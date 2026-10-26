@@ -7,6 +7,11 @@ import { searchInvoiceClients, searchInvoiceServices } from "@/lib/invoices/invo
 import { toCreateDraftInvoiceInput, toUpdateFullDraftInvoiceInput } from "@/lib/invoices/invoice-entry-form-server";
 import { parseInvoiceDraftFormPayload } from "@/lib/invoices/invoice-entry-ui";
 import { issueInvoice, InvoiceIssuanceError } from "@/lib/invoices/issue-invoice";
+import { generateInvoiceIntentForOrganization } from "@/lib/invoices/invoice-intent-service";
+
+export async function generateInvoiceIntentAction(organizationSlug: string, naturalLanguageText: unknown) {
+  return generateInvoiceIntentForOrganization(organizationSlug, naturalLanguageText);
+}
 
 export async function searchCreateClientsAction(organizationSlug: string, query: string) {
   try {

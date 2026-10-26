@@ -37,12 +37,19 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - Permanent per-client To/CC/BCC defaults are a future enhancement; recipients are selected per send.
 
 ## Invoice currency
-
 - `Invoice.currencyCode` is authoritative for the amounts on that invoice. Draft invoices default to `LKR` and may change currency while they remain DRAFT.
 - Normalize currency codes to uppercase and accept only exactly three ASCII letters. Reject malformed values; do not infer or convert another currency.
 - Issuance locks the normalized invoice currency. Treat currency as immutable after issuance; no exchange-rate or currency-conversion behavior is implemented.
 - `Service.currencyCode` describes the currency of `defaultUnitPrice`. Do not auto-fill or convert a service default price when it differs from the invoice currency; require an explicit invoice unit price in the invoice currency.
 - A future conventional invoice form will expose a Currency selector defaulting to LKR. Example choices include LKR, USD, CAD, GBP, EUR, and AUD.
+
+## AI invoice suggestions
+
+- Quick Invoice with AI is an optional extraction aid on the production new-invoice page. AI output is a suggestion, not invoice truth. A user must review it and explicitly apply it to the normal editable form; the ordinary Save Draft action is still required.
+- The model may suggest client/service names but never supplies trusted database IDs. Resolve a name only against active records in the authenticated organization and only when exactly one normalized exact match exists. Unmatched or duplicate names remain unresolved for normal user search/selection.
+- The AI never supplies subtotal, line total, grand total, invoice number, lifecycle/payment status, sequence, or template identity. Existing server financial functions calculate and validate all totals. A matched service does not apply its default price; any extracted price remains a user-reviewed suggestion.
+- Currency must be explicit and unambiguous. Never guess an unqualified `$`, default an AI result to LKR, or convert currency. Percentage discounts are unsupported; require a fixed discount amount. Missing or ambiguous details remain visible for user completion.
+- Relative due days are applied deterministically in the application using an explicit invoice date when present, otherwise the current Asia/Colombo date. AI cannot save, issue, number, email, or record payment.
 ## Invoice templates
 
 - MVP1 uses the Hiiiive invoice template. Template records are organization-scoped; future SaaS may support multiple templates per organization.

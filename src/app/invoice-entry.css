@@ -117,6 +117,22 @@
 .entry-inline-error { color: #a14338 !important; }
 .entry-page button:focus-visible, .entry-page input:focus-visible, .entry-page select:focus-visible, .entry-page textarea:focus-visible { outline: 3px solid #55968666; outline-offset: 2px; }
 
+.invoice-ai-card { max-width: 1440px; margin: 0 auto 18px; border-color: #dce9e4; background: linear-gradient(120deg, #fff 0%, #f9fcfa 100%); }
+.invoice-ai-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+.invoice-ai-input .entry-field { margin: 0; }
+.invoice-ai-input textarea { min-height: 78px; resize: vertical; }
+.invoice-ai-input button { min-height: 42px; }
+.invoice-ai-suggestion { display: grid; gap: 12px; margin-top: 17px; border-top: 1px solid #e3ece8; padding-top: 16px; }
+.invoice-ai-suggestion h3 { margin: 0; color: #26383a; font-size: 16px; }
+.invoice-ai-suggestion dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; margin: 0; }
+.invoice-ai-suggestion dl > div { min-width: 0; }
+.invoice-ai-suggestion dt { margin-bottom: 3px; color: #7e8e8e; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.invoice-ai-suggestion dd { margin: 0; color: #334448; font-size: 13px; overflow-wrap: anywhere; }
+.invoice-ai-suggestion ul { margin: 5px 0 0; padding-left: 18px; }
+.invoice-ai-suggestion li + li { margin-top: 4px; }
+.invoice-ai-notes { border-left: 3px solid #d6a84c; padding: 5px 10px; color: #775d2c; background: #fffaf0; font-size: 12px; }
+.invoice-ai-notes ul { margin-top: 4px; }
+.invoice-ai-suggestion > button { justify-self: start; }
 .email-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); align-items: start; gap: 18px; max-width: 1120px; margin: 0 auto; }
 .email-compose { display: grid; gap: 15px; }
 .email-compose textarea { resize: vertical; }
@@ -178,4 +194,7 @@
   .email-form-actions .entry-button { width: 100%; }
   .entry-success a { width: 100%; margin: 3px 0 0; }
   .entry-success button { width: 100%; margin: 3px 0 0; text-align: left; }
+  .invoice-ai-input { grid-template-columns: 1fr; }
+  .invoice-ai-input button, .invoice-ai-suggestion > button { width: 100%; }
+  .invoice-ai-suggestion dl { grid-template-columns: 1fr; }
 }
