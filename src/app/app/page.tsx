@@ -20,7 +20,7 @@ export default async function ApplicationHomePage() {
   if (accessMessage) return <WorkspaceMessage message={accessMessage} />;
   if (!memberships?.length) return <WorkspaceMessage message="Your account is not provisioned for an organization yet. Contact an administrator." />;
   if (memberships.length === 1) {
-    redirect(`/app/${encodeURIComponent(memberships[0]!.organization.slug)}/invoices/new`);
+    redirect(`/app/${encodeURIComponent(memberships[0]!.organization.slug)}/invoices`);
   }
 
   return <main className="app-workspace-gate">
@@ -29,7 +29,7 @@ export default async function ApplicationHomePage() {
       <h1 id="workspace-heading">Choose an organization</h1>
       <p>Select an organization where you have active access.</p>
       <ul>{memberships.map(({ id, organization }) => <li key={id}>
-        <a href={`/app/${encodeURIComponent(organization.slug)}/invoices/new`}>
+        <a href={`/app/${encodeURIComponent(organization.slug)}/invoices`}>
           <strong>{organization.name}</strong><span>Open invoice workspace</span>
         </a>
       </li>)}</ul>

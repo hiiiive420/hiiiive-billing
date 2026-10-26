@@ -23,9 +23,10 @@ export default async function IssuedInvoicePage({ params }: { params: Promise<{ 
     return <main className="preview-shell"><p role="alert">This issued invoice could not be rendered. Its saved document configuration may require historical review.</p></main>;
   }
   const invoiceDocument = createElement(resolveInvoiceRenderer(document.rendererKey), { config: document.config, invoice: document.invoice });
+  const workspaceHref = `/app/${encodeURIComponent(workspace.organizationSlug)}/invoices`;
   const basePath = `/app/${encodeURIComponent(workspace.organizationSlug)}/invoices/${encodeURIComponent(invoiceId)}`;
   return <main className="preview-shell">
-    <div className="preview-banner"><strong>{document.invoice.invoiceNumber}</strong> | {document.lifecycleStatus.replaceAll("_", " ")} | {document.paymentStatus.replaceAll("_", " ")}
+    <div className="preview-banner"><Link className="entry-button entry-button-light invoice-workspace-breadcrumb" href={workspaceHref}>Invoices</Link> · <strong>{document.invoice.invoiceNumber}</strong> | {document.lifecycleStatus.replaceAll("_", " ")} | {document.paymentStatus.replaceAll("_", " ")}
       <div className="document-actions"><Link className="entry-button entry-button-light" href={`${basePath}/pdf`} download>Download PDF</Link>{document.lifecycleStatus === "ISSUED" && hasPermission(workspace.role, "INVOICE_SEND") && <Link className="entry-button entry-button-primary" href={`${basePath}/send`}>Send Invoice</Link>}</div>
     </div>
     <InvoicePreviewScale>{invoiceDocument}</InvoicePreviewScale>

@@ -25,6 +25,13 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - An issued invoice may be Paid, Partially Paid, Superseded/Reworked, Void, or Written Off where an authorized process permits it.
 - Preserve the original invoice and its audit history when it is superseded, voided, or written off. Record the reason and relevant actor.
 
+## Invoice workspace
+- `/app/[organizationSlug]/invoices` is the production invoice operations landing page and requires `INVOICE_READ`. The URL slug is resolved through the authenticated user's active organization membership; browser input cannot supply an organization ID.
+- The workspace is read-only with respect to invoice, payment, lifecycle, numbering, and email-delivery truth. It displays persisted financial values and statuses and provides only links to separately authorized operations.
+- Organization-wide summary cards count DRAFT invoices; ISSUED + UNPAID; ISSUED + PARTIALLY_PAID; and ISSUED + PAID. SUPERSEDED, VOID, and WRITTEN_OFF records are excluded from these active payment cards. Counts do not change with table filters and contain no financial totals.
+- Draft rows use the current related client name; issued-family rows use the frozen client name snapshot when present. Drafts display “Draft” instead of an invoice number; issued-family rows use their persisted number. Draft payment and email cells are not presented as unpaid or never-sent.
+- Search, lifecycle/payment filters, sorting, and 25-row pagination are server-side and URL-driven. Payment filters apply only to non-draft invoices. The workspace exposes latest delivery status only, without recipient arrays or provider details. No payment-recording or lifecycle mutation is performed from this workspace.
+
 ## Issued invoice email
 
 - Issuing an invoice does not send email. Email sending is a separate authorized human action after issuance.

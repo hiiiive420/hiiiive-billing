@@ -100,4 +100,12 @@ Outside production, `DEV_AUTH_EMAIL` provides a deliberately explicit server-onl
 
 Record immutable audit events for important invoice actions, including actor, timestamp, action, and relevant reason or metadata. Restrict access to internal notes and operational details to authorized users.
 
+## Invoice workspace reads
+
+- The production invoice list requires `INVOICE_READ`; the route resolves its slug only through the authenticated user's active memberships with `requireOrganizationBySlug()`.
+- The server-only workspace read model requires the trusted organization ID produced by that authorization check and applies tenant scope to list rows, searches, and counts. Query parameters can select bounded search/filter/sort/page options only; they cannot select tenant IDs or database columns.
+- The workspace returns a minimal row projection and never loads payment histories, invoice items, template configuration, email bodies, recipient arrays, BCC values, SMTP/provider identifiers, or provider failure details. It selects only the latest email-attempt status and timestamp for each bounded page row.
+- Create, draft-edit, send, view, and PDF links are gated by centralized permissions where appropriate. Every destination continues to authorize independently on the server; hiding a link is not the security boundary.
+- This read surface performs no invoice, payment, email-attempt, numbering, or lifecycle writes.
+
 

@@ -7,7 +7,7 @@ type EmailAction = (input: unknown) => Promise<{ ok: true; attemptId: string } |
 
 export function InvoiceEmailForm({
   invoiceNumber, fromDisplay, senderConfigured, attachmentFilename, initialTo, subject: initialSubject,
-  bodyText: initialBody, recentAttempts, invoiceHref, sendAction,
+  bodyText: initialBody, recentAttempts, workspaceHref, invoiceHref, sendAction,
 }: {
   invoiceNumber: string;
   fromDisplay: string;
@@ -17,6 +17,7 @@ export function InvoiceEmailForm({
   subject: string;
   bodyText: string;
   recentAttempts: readonly { id: string; status: "PENDING" | "SENT" | "PARTIALLY_SENT" | "FAILED"; timestamp: string; toRecipients: readonly string[]; ccCount: number }[];
+  workspaceHref: string;
   invoiceHref: string;
   sendAction: EmailAction;
 }) {
@@ -41,7 +42,7 @@ export function InvoiceEmailForm({
   }
 
   return <main className="entry-page entry-page-production email-page">
-    <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><span>Invoice {invoiceNumber}</span></div>
+    <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><Link href={workspaceHref}>Invoices</Link><span>Invoice {invoiceNumber}</span></div>
     <header className="entry-header">
       <div><div className="entry-eyebrow">INVOICES <span>/</span> EMAIL</div><div className="entry-title-row"><h1>Send Invoice {invoiceNumber}</h1></div></div>
       <Link className="entry-button entry-button-light" href={invoiceHref}>Back to Invoice</Link>

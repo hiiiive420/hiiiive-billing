@@ -29,7 +29,7 @@ export default async function OrganizationDraftPreviewPage({ params }: { params:
   const issue = issueOrganizationInvoiceAction.bind(null, workspace.organizationSlug, invoiceId);
   return <main className="preview-shell">
     <div className="preview-banner"><strong>DRAFT PREVIEW</strong> | Uses the current client details and active default template; these are not frozen until issue.
-      <div className="document-actions"><Link className="entry-button entry-button-light" href={`${basePath}/${encodeURIComponent(invoiceId)}/edit`}>Back to Edit</Link><IssueInvoiceControl issue={issue} invoiceBasePath={basePath} /></div>
+      <div className="document-actions"><Link className="entry-button entry-button-light" href={basePath}>Invoices</Link><Link className="entry-button entry-button-light" href={`${basePath}/${encodeURIComponent(invoiceId)}/edit`}>Back to Edit</Link><IssueInvoiceControl issue={issue} invoiceBasePath={basePath} /></div>
     </div>
     <InvoicePreviewScale>{invoiceDocument}</InvoicePreviewScale>
   </main>;

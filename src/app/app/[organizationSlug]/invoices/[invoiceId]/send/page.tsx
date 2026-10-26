@@ -24,6 +24,7 @@ export default async function SendInvoicePage({ params }: { params: Promise<{ or
     if (error instanceof InvoiceEmailError) notFound();
     return <main className="app-workspace-gate"><section className="app-workspace-card" role="alert"><h1>Email invoice</h1><p>We couldn&apos;t load this issued invoice.</p></section></main>;
   }
+  const workspaceHref = `/app/${encodeURIComponent(workspace.organizationSlug)}/invoices`;
   const invoiceHref = `/app/${encodeURIComponent(workspace.organizationSlug)}/invoices/${encodeURIComponent(invoiceId)}`;
   const sendAction = sendOrganizationInvoiceEmailAction.bind(null, workspace.organizationSlug, invoiceId);
   return <InvoiceEmailForm
@@ -35,6 +36,7 @@ export default async function SendInvoicePage({ params }: { params: Promise<{ or
     subject={composer.defaults.subject}
     bodyText={composer.defaults.bodyText}
     recentAttempts={composer.recentAttempts}
+    workspaceHref={workspaceHref}
     invoiceHref={invoiceHref}
     sendAction={sendAction}
   />;
