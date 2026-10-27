@@ -1,43 +1,43 @@
 ﻿# Codex Handoff
 
 ## Task
-INV-025 — Invoice Workspace / List / Search / Status
+INV-026 — Payment Recording & Payment History UI
 
 ## Status
-Implementation complete and uncommitted. No migration was required.
+Implementation complete and uncommitted. INV-026A confirms the payment UI copy, CSS classes, and safe eligibility error mapping. No migration was required.
 
 ## Summary
-Added the production invoice operations workspace. The workspace is read-only with respect to invoice, payment, lifecycle, numbering, and email-delivery state; actions continue through separately authorized routes.
+Added a tenant-scoped payment summary and history view for invoices, plus an authorized payment recording flow that delegates financial validation, locking, and status updates to the existing transaction service. The frozen issued invoice document remains unchanged.
 
-## Route / Navigation
-`/app` redirects a single-membership user to `/app/{organizationSlug}/invoices`. Users with multiple memberships choose an organization and enter the same workspace. Workspace access/gate copy displays the spaced brand, “Hiiiive Billing”. The workspace requires `INVOICE_READ` and provides `+ New Invoice` only with `INVOICE_CREATE`. Create/edit, issued invoice, preview, and send views include a usable Next.js link to the invoice workspace, built from the authorized server route context.
+## Routes / Navigation
+The issued invoice page displays a compact payment summary above the A4 document. `View Payments` opens `/app/[organizationSlug]/invoices/[invoiceId]/payments`; `Record Payment` is offered when the user has `PAYMENT_RECORD` and the invoice lifecycle is ISSUED. The payment page links back to the issued invoice and invoice workspace.
 
-## Workspace Read Model
-`src/lib/invoices/invoice-workspace.ts` validates query inputs and returns a 25-row tenant-scoped page, minimal row DTOs, latest email attempt status/time, and full-organization summary counts. It does not return invoice items, payments, recipient lists, BCC, email bodies, or provider fields. Draft client names come from the current Client; issued-family names prefer `clientNameSnapshot`. Persisted invoice numbers, dates, currency, and grand totals are displayed without recalculation. The operational Updated timestamp is formatted in Asia/Colombo; date-only invoiceDate remains formatted in UTC to preserve its calendar day.
+## Payment Read Model
+`src/lib/invoices/invoice-payments.ts` scopes invoice lookup to the trusted organization ID and returns persisted invoice values, exact Decimal payment totals, balances, overpayment, and supported history fields as strings/ISO dates. Issued client display prefers the frozen snapshot. Reads compare the payment-row sum with persisted paymentStatus and report mismatches without repairing state.
 
-## Summary Counts
-Cards count DRAFT; ISSUED + UNPAID; ISSUED + PARTIALLY_PAID; and ISSUED + PAID. SUPERSEDED, VOID, and WRITTEN_OFF are excluded. Counts are organization-wide and independent of table filters.
+## Record Payment Flow
+The payment Server Action independently resolves the authorized organization through `requireOrganizationBySlug(..., "PAYMENT_RECORD")`, parses only amount, payment date, method, reference, and internal note, then calls the existing `recordPayment()` service. It revalidates the payment page, issued invoice, and workspace. The form stays on the payment page and refreshes authoritative server data after success.
 
-## Search / Filters / Sort
-Search is trimmed, case-insensitive, bounded to 100 characters, and server-side across invoice number, project title, draft current client name, and issued-family snapshot name. Lifecycle/payment filters and four allowlisted sort keys are URL-driven. Payment filters exclude drafts. Invalid query keys fall back to safe defaults. Pagination is server-side at 25 rows and clamps out-of-range pages.
+## Existing Payment Business Rules
+The existing service allows recording only for ISSUED invoices; DRAFT, SUPERSEDED, VOID, and WRITTEN_OFF are rejected. It requires a positive amount with no more than four decimal places, uses the invoice currency, takes the existing invoice row lock, and updates paymentStatus from the aggregate payment sum. Payment history is append-only in the UI. The Payment model does not record who entered a payment.
 
-## Lifecycle / Payment Display
-Drafts display “Draft”, current client name, invoice date or “Not set”, and no payment/email status. Issued-family rows display the permanent invoice number and frozen client name when available. Lifecycle and payment states use separate restrained chips. Only DRAFT, ISSUED, SUPERSEDED, VOID, and WRITTEN_OFF are represented.
+## Partial / Full / Overpayment Behavior
+Zero paid is UNPAID; a positive sum below grandTotal is PARTIALLY_PAID; a sum at or above grandTotal is PAID. Overpayment is accepted by the existing service: grandTotal stays unchanged, balance due is shown as zero, and the excess is shown as Overpaid. Additional payments on a PAID invoice are explicitly described as potentially overpaying.
 
-## Email Delivery Status
-The latest attempt determines Sending, Sent, Partially sent, or Failed; no attempt displays Never sent. Drafts show a dash. The query requests one attempt per displayed invoice and exposes only status and terminal/created timestamp.
+## Payment History
+History is newest first by payment date, with recorded time and ID tie-breakers. It shows the model's amount, payment date, method, reference, internal note, and recorded-at timestamp. No edit, delete, refund, reversal, or receipt email is available.
 
 ## RBAC / Tenant Isolation
-The route resolves the slug through `requireOrganizationBySlug(slug, "INVOICE_READ")`. The read model accepts only that trusted organization ID and scopes list, search, and counts. Central `hasPermission()` gates create, edit, and send links; destination pages remain independently authorized. VIEWER can read and cannot create, edit, or send.
+The payment page requires `PAYMENT_READ`; the Server Action independently requires `PAYMENT_RECORD`. The slug is resolved against active memberships, and only the returned organization ID scopes data and writes. Browser input cannot override organization scope, currency, totals, payment status, role, or user identity; invoice IDs remain tenant-scoped by the existing service.
 
 ## Responsive UI
-Desktop uses an operational invoice table. At tablet/mobile widths it becomes compact invoice cards with tappable actions; the desktop table is hidden to avoid forcing horizontal overflow.
+Summary cards and form stack on narrow screens. Payment history rows become compact readable cards without horizontal overflow.
 
 ## Tests and Checks
-- `npm test` — passed: 162 unit/integration tests and 8 PDF tests.
+- `npm test` — passed: 165 unit/integration tests and 8 PDF tests.
 - `npm run typecheck` — passed.
-- `npm run lint` — passed without warnings.
-- `npm run build` — passed; `/app/[organizationSlug]/invoices` is in the production route manifest.
+- `npm run lint` — passed.
+- `npm run build` — passed; `/app/[organizationSlug]/invoices/[invoiceId]/payments` is in the production route manifest.
 - `npm run db:migrate:status` — passed; all 13 migrations are applied.
 - `npm audit --omit=dev` — passed; 0 production vulnerabilities.
 - `git diff --check` — passed.
@@ -45,5 +45,5 @@ Desktop uses an operational invoice table. At tablet/mobile widths it becomes co
 ## Migration Status
 No schema or migration changes were made. Database is up to date at 13 migrations.
 
-## Blockers / Next Step
-No implementation blocker. Final interactive desktop/mobile browser acceptance remains for the operator; no browser automation tool is connected in this session.
+## Limitations / Next Step
+Wrong payments cannot be corrected in this MVP because edit/delete/refund/reversal flows are not included. No recorder identity is stored. After acceptance, suggested next task: INV-027 — Client & Service Management UI.

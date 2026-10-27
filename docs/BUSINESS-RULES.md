@@ -23,6 +23,15 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - Future SaaS may support configurable numbering formats; Hiiiive MVP uses the format above.
 - Issued financial data must not be silently edited.
 - An issued invoice may be Paid, Partially Paid, Superseded/Reworked, Void, or Written Off where an authorized process permits it.
+
+## Payment recording and history
+
+- Payments can be recorded only while an invoice lifecycle is `ISSUED`; `DRAFT`, `SUPERSEDED`, `VOID`, and `WRITTEN_OFF` are ineligible under the existing service.
+- Payment amounts must be positive and support at most four decimal places. They use the invoice's persisted currency; no conversion is performed.
+- `totalPaid` is the exact Decimal sum of tenant-scoped Payment rows. Payment status is `UNPAID` at zero, `PARTIALLY_PAID` when positive and below `grandTotal`, and `PAID` when it meets or exceeds `grandTotal`.
+- The existing service permits overpayment. It preserves `grandTotal`, records the full payment, and sets `PAID`; the UI shows zero balance due and the explicit overpaid amount.
+- Payments are append-only in the MVP UI. There is no edit, delete, refund, reversal, or receipt-email flow. The Payment model does not record the user who entered a payment.
+- Payment history displays supported fields only and orders newest first by payment date, with creation time and ID as tie-breakers. Reads reconcile persisted payment status with the sum and never repair a mismatch.
 - Preserve the original invoice and its audit history when it is superseded, voided, or written off. Record the reason and relevant actor.
 
 ## Invoice workspace

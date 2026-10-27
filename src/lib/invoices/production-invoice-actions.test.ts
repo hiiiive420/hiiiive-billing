@@ -14,11 +14,62 @@ import {
   updateOrganizationDraftAction,
 } from "@/app/app/[organizationSlug]/invoices/actions";
 import { sendOrganizationInvoiceEmailAction } from "@/app/app/[organizationSlug]/invoices/[invoiceId]/send/actions";
+import { recordOrganizationInvoicePaymentAction } from "@/app/app/[organizationSlug]/invoices/[invoiceId]/payments/actions";
+import { loadInvoicePaymentSummary } from "./invoice-payments";
 
 const prisma = getPrismaClient();
 after(async () => { await prisma.$disconnect(); });
 
 describe("production invoice Server Actions (PostgreSQL integration)", () => {
+  it("requires PAYMENT_RECORD and accepts only supported payment fields with trusted tenant scope", async () => {
+    const token = randomUUID();
+    const email = `payment-action-${token}@example.test`;
+    const org = await prisma.organization.create({ data: { name: `Payments ${token}`, slug: `payment-action-${token}` } });
+    const foreignOrg = await prisma.organization.create({ data: { name: `Foreign ${token}`, slug: `foreign-payment-${token}` } });
+    const user = await prisma.user.create({ data: { email } });
+    const client = await prisma.client.create({ data: { organizationId: org.id, name: "Frozen Payment Client" } });
+    const invoice = await prisma.invoice.create({ data: {
+      organizationId: org.id, clientId: client.id, invoiceNumber: `I${token.slice(0, 8)}`,
+      lifecycleStatus: "ISSUED", paymentStatus: "UNPAID", currencyCode: "USD", grandTotal: "100",
+      clientNameSnapshot: "Frozen Payment Client", issuedAt: new Date(),
+    } });
+    const previousDevEmail = process.env.DEV_AUTH_EMAIL;
+    process.env.DEV_AUTH_EMAIL = email;
+    try {
+      await prisma.organizationMembership.create({ data: { organizationId: org.id, userId: user.id, role: OrganizationRole.VIEWER } });
+      const denied = await recordOrganizationInvoicePaymentAction(org.slug, invoice.id, { amount: "25", paidAt: "2026-10-20", method: "CASH" });
+      assert.equal(denied.ok, false);
+      assert.equal(await prisma.payment.count({ where: { organizationId: org.id, invoiceId: invoice.id } }), 0);
+
+      await prisma.organizationMembership.updateMany({ where: { organizationId: org.id, userId: user.id }, data: { role: OrganizationRole.BILLING } });
+      const accepted = await recordOrganizationInvoicePaymentAction(org.slug, invoice.id, {
+        amount: "25.50", paidAt: "2026-10-21", method: "CASH", reference: "  receipt-1  ", internalNote: "  cash desk  ",
+        organizationId: foreignOrg.id, invoiceId: randomUUID(), currencyCode: "EUR", grandTotal: "1",
+        paymentStatus: "PAID", role: "ADMIN", userId: "forged-user",
+      });
+      assert.deepEqual(accepted, { ok: true });
+      const payment = await prisma.payment.findFirstOrThrow({ where: { organizationId: org.id, invoiceId: invoice.id } });
+      assert.equal(payment.amount.toString(), "25.5");
+      assert.equal(payment.reference, "receipt-1");
+      assert.equal(payment.internalNote, "cash desk");
+      const persisted = await prisma.invoice.findFirstOrThrow({ where: { id: invoice.id } });
+      assert.equal(persisted.currencyCode, "USD");
+      assert.equal(persisted.grandTotal.toString(), "100");
+      assert.equal(persisted.paymentStatus, "PARTIALLY_PAID");
+      assert.equal((await loadInvoicePaymentSummary(org.id, invoice.id)).totalPaid, "25.5");
+      assert.equal((await recordOrganizationInvoicePaymentAction(foreignOrg.slug, invoice.id, { amount: "1", paidAt: "2026-10-21", method: "CASH" })).ok, false);
+    } finally {
+      if (previousDevEmail === undefined) delete process.env.DEV_AUTH_EMAIL;
+      else process.env.DEV_AUTH_EMAIL = previousDevEmail;
+      await prisma.payment.deleteMany({ where: { organizationId: org.id } });
+      await prisma.invoice.deleteMany({ where: { organizationId: org.id } });
+      await prisma.organizationMembership.deleteMany({ where: { organizationId: org.id } });
+      await prisma.client.deleteMany({ where: { organizationId: org.id } });
+      await prisma.user.deleteMany({ where: { id: user.id } });
+      await prisma.organization.deleteMany({ where: { id: { in: [org.id, foreignOrg.id] } } });
+    }
+  });
+
   it("authorizes each operation, derives tenant scope from membership, creates, and atomically edits drafts", async () => {
     const token = randomUUID();
     const email = `workspace-${token}@example.test`;

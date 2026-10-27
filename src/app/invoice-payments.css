@@ -1,0 +1,45 @@
+.invoice-payments-page { max-width: 100%; }
+.invoice-payment-breadcrumbs { display: flex; gap: 18px; max-width: 1440px; margin: 18px auto 0; font-size: 13px; font-weight: 600; }
+.invoice-payment-breadcrumbs a { color: #347467; text-decoration: none; }
+.invoice-payment-breadcrumbs a:hover { text-decoration: underline; }
+.invoice-payment-header { padding-bottom: 18px; }
+.invoice-payment-header .entry-title-row { flex-wrap: wrap; }
+.invoice-payment-client { margin: 8px 0 0; color: #647477; font-size: 14px; }
+.invoice-payment-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; max-width: 1440px; margin: 0 auto 20px; }
+.invoice-payment-summary article { display: grid; align-content: start; gap: 9px; min-height: 90px; border: 1px solid #e3e9e8; border-radius: 10px; padding: 15px 17px; background: white; }
+.invoice-payment-summary article > span:first-child { color: #718184; font-size: 12px; font-weight: 600; }
+.invoice-payment-summary strong { color: #26383d; font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.invoice-payment-overpaid { border-color: #edcfbb !important; background: #fffaf6 !important; }
+.invoice-payment-overpaid strong, .invoice-payment-warning { color: #96582c; }
+.invoice-payment-warning, .invoice-payment-readonly { max-width: 1440px; margin: 0 auto 16px; border-radius: 8px; padding: 11px 14px; background: #fff5e8; font-size: 13px; }
+.invoice-payment-readonly { color: #657477; background: #fff; }
+.invoice-payment-form, .invoice-payment-history { max-width: 1440px; margin: 0 auto 18px; }
+.invoice-payment-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; margin-bottom: 18px; }
+.invoice-payment-note { grid-column: 1 / -1; }
+.invoice-payment-success, .invoice-payment-error { margin: 0 0 14px; font-size: 13px; }
+.invoice-payment-success { color: #287052; }
+.invoice-payment-error { color: #a13c32; }
+.invoice-payment-empty { color: #718184; font-size: 14px; }
+.invoice-payment-history-list { display: grid; }
+.invoice-payment-history-item { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1fr); gap: 18px; border-top: 1px solid #edf0ef; padding: 15px 0; color: #718184; font-size: 12px; overflow-wrap: anywhere; }
+.invoice-payment-history-primary, .invoice-payment-history-item > div:nth-child(2) { display: grid; align-content: start; gap: 5px; }
+.invoice-payment-history-primary strong { color: #26383d; font-size: 16px; }
+.invoice-payment-history-item p { margin: 0; color: #425459; white-space: pre-wrap; }
+.issued-payment-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin: 0 0 18px; border: 1px solid #e2e9e8; border-radius: 10px; padding: 12px 15px; background: #fff; color: #33454b; font: 400 13px/1.4 "DM Sans", sans-serif; }
+.issued-payment-heading { display: flex; align-items: center; gap: 9px; }
+.issued-payment-summary dl { display: flex; flex: 1; flex-wrap: wrap; gap: 10px 22px; margin: 0; }
+.issued-payment-summary dl > div { display: grid; gap: 2px; }
+.issued-payment-summary dt { color: #7a898b; font-size: 11px; }
+.issued-payment-summary dd { margin: 0; font-weight: 600; }
+.issued-payment-actions { display: flex; gap: 7px; }
+.issued-payment-actions .entry-button { min-height: 36px; padding: 0 11px; font-size: 12px; }
+.issued-payment-summary p { flex-basis: 100%; margin: 0; color: #96582c; font-size: 11px; }
+@media (max-width: 640px) {
+  .issued-payment-summary { align-items: flex-start; }
+  .issued-payment-summary dl { flex-basis: 100%; }
+  .invoice-payment-breadcrumbs { flex-wrap: wrap; }
+  .invoice-payment-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .invoice-payment-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .invoice-payment-note { grid-column: auto; }
+  .invoice-payment-history-item { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}

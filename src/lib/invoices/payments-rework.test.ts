@@ -6,6 +6,7 @@ import { after, describe, it } from "node:test";
 import { Prisma } from "@/generated/prisma/client";
 import { getPrismaClient } from "../prisma";
 import { issueInvoice } from "./issue-invoice";
+import { InvoicePaymentReadModelError, loadInvoicePaymentSummary } from "./invoice-payments";
 import { PaymentRecordingError, recordPayment } from "./record-payment";
 import { InvoiceReworkError, supersedeInvoice } from "./rework-invoice";
 
@@ -135,6 +136,59 @@ describe("recordPayment (PostgreSQL integration)", () => {
       assert.equal(payments.length, 2);
       assert.equal(total.toString(), "100");
       assert.equal(invoice.paymentStatus, "PAID");
+    });
+  });
+});
+
+describe("invoice payment read model (PostgreSQL integration)", () => {
+  it("reconciles zero, partial, full, ordered history and overpayment using frozen invoice values", async () => {
+    await withOrganization(async ({ organizationId, clientId }) => {
+      const invoiceId = await createDraftInvoice(organizationId, clientId, "100");
+      await prisma.invoice.update({ where: { id: invoiceId }, data: { currencyCode: "USD" } });
+      await issueInvoice(organizationId, invoiceId);
+      await prisma.client.update({ where: { id: clientId }, data: { name: "Renamed Current Client" } });
+
+      let summary = await loadInvoicePaymentSummary(organizationId, invoiceId);
+      assert.equal(summary.currencyCode, "USD");
+      assert.equal(summary.clientName, "Payments Test Client");
+      assert.equal(summary.grandTotal, "100");
+      assert.equal(summary.totalPaid, "0");
+      assert.equal(summary.balanceDue, "100");
+      assert.equal(summary.paymentStatus, "UNPAID");
+      assert.equal(summary.payments.length, 0);
+
+      await recordPayment(organizationId, invoiceId, { ...paymentInput("20"), paidAt: new Date("2026-10-20T10:00:00.000Z") });
+      await recordPayment(organizationId, invoiceId, { ...paymentInput("35"), paidAt: new Date("2026-10-21T10:00:00.000Z") });
+      summary = await loadInvoicePaymentSummary(organizationId, invoiceId);
+      assert.equal(summary.totalPaid, "55");
+      assert.equal(summary.balanceDue, "45");
+      assert.equal(summary.paymentStatus, "PARTIALLY_PAID");
+      assert.equal(summary.payments[0].amount, "35");
+      assert.equal(summary.payments[1].amount, "20");
+
+      await recordPayment(organizationId, invoiceId, paymentInput("45"));
+      summary = await loadInvoicePaymentSummary(organizationId, invoiceId);
+      assert.equal(summary.totalPaid, "100");
+      assert.equal(summary.balanceDue, "0");
+      assert.equal(summary.paymentStatus, "PAID");
+      await recordPayment(organizationId, invoiceId, paymentInput("7.25"));
+      summary = await loadInvoicePaymentSummary(organizationId, invoiceId);
+      assert.equal(summary.totalPaid, "107.25");
+      assert.equal(summary.balanceDue, "0");
+      assert.equal(summary.overpaidAmount, "7.25");
+      assert.equal(summary.paymentStatus, "PAID");
+      assert.equal((await getInvoice(organizationId, invoiceId)).grandTotal.toString(), "100");
+    });
+  });
+
+  it("does not expose foreign invoices and rejects persisted payment-status mismatches", async () => {
+    await withOrganization(async ({ organizationId, clientId }) => {
+      const invoiceId = await createIssuedInvoice(organizationId, clientId, "100");
+      await withOrganization(async (foreign) => {
+        await assert.rejects(loadInvoicePaymentSummary(organizationId, await createIssuedInvoice(foreign.organizationId, foreign.clientId, "100")), InvoicePaymentReadModelError);
+      }, "read-model-foreign");
+      await prisma.invoice.update({ where: { id: invoiceId }, data: { paymentStatus: "PAID" } });
+      await assert.rejects(loadInvoicePaymentSummary(organizationId, invoiceId), /does not match/);
     });
   });
 });
