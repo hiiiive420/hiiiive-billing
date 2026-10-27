@@ -6,6 +6,7 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 
 - MVP1 has one organization: Hiiiive.
 - Organization-owned data must include `organizationId` to support a future multi-tenant SaaS product.
+- Client and Service master data have dedicated authorization: ADMIN and BILLING may read, create, and edit; VIEWER has no Client/Service master-data access. Invoice visibility does not imply master-data access.
 
 ## Invoice lifecycle and numbering
 

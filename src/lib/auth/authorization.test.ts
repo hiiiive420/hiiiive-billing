@@ -25,7 +25,7 @@ describe("organization authorization (PostgreSQL integration)", () => {
   it("enforces the complete role matrix and denies unknown roles", () => {
     const expected: Record<string, readonly string[]> = {
       ADMIN: PERMISSIONS,
-      BILLING: ["INVOICE_READ", "INVOICE_CREATE", "INVOICE_EDIT_DRAFT", "INVOICE_ISSUE", "INVOICE_SEND", "PAYMENT_READ", "PAYMENT_RECORD"],
+      BILLING: ["INVOICE_READ", "INVOICE_CREATE", "INVOICE_EDIT_DRAFT", "INVOICE_ISSUE", "INVOICE_SEND", "PAYMENT_READ", "PAYMENT_RECORD", "CLIENT_READ", "CLIENT_CREATE", "CLIENT_EDIT", "SERVICE_READ", "SERVICE_CREATE", "SERVICE_EDIT"],
       VIEWER: ["INVOICE_READ", "PAYMENT_READ"],
     };
     for (const role of [OrganizationRole.ADMIN, OrganizationRole.BILLING, OrganizationRole.VIEWER]) {
@@ -35,6 +35,17 @@ describe("organization authorization (PostgreSQL integration)", () => {
     }
     assert.equal(hasPermission("FUTURE_ROLE", "INVOICE_READ"), false);
     assert.equal(hasPermission("toString", "INVOICE_READ"), false);
+    const masterDataPermissions = ["CLIENT_READ", "CLIENT_CREATE", "CLIENT_EDIT", "SERVICE_READ", "SERVICE_CREATE", "SERVICE_EDIT"] as const;
+    for (const permission of masterDataPermissions) {
+      assert.equal(hasPermission(OrganizationRole.ADMIN, permission), true, `ADMIN / ${permission}`);
+      assert.equal(hasPermission(OrganizationRole.BILLING, permission), true, `BILLING / ${permission}`);
+      assert.equal(hasPermission(OrganizationRole.VIEWER, permission), false, `VIEWER / ${permission}`);
+    }
+    assert.equal(hasPermission(OrganizationRole.ADMIN, "USER_ADMIN"), true);
+    assert.equal(hasPermission(OrganizationRole.BILLING, "PAYMENT_RECORD"), true);
+    assert.equal(hasPermission(OrganizationRole.VIEWER, "INVOICE_READ"), true);
+    assert.equal(hasPermission(OrganizationRole.VIEWER, "PAYMENT_READ"), true);
+    assert.equal(hasPermission(OrganizationRole.VIEWER, "INVOICE_CREATE"), false);
   });
 
   it("resolves active app users and active memberships, and denies inactive or foreign membership", async () => {

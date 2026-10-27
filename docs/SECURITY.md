@@ -17,6 +17,7 @@ Outside production, `DEV_AUTH_EMAIL` provides a deliberately explicit server-onl
 - RBAC is organization-scoped through `OrganizationMembership`; a user's role applies within that organization.
 - UI visibility is not authorization. Hiding controls or pages does not protect data or operations.
 - `src/lib/auth/authorization.ts` centralizes the server-side permission matrix. Every protected operation must enforce permission and organization scope on the server; UI visibility is not authorization.
+- Client and Service master data use dedicated `CLIENT_READ`, `CLIENT_CREATE`, `CLIENT_EDIT`, `SERVICE_READ`, `SERVICE_CREATE`, and `SERVICE_EDIT` permissions. ADMIN and BILLING may read/create/edit this data; VIEWER receives none of these permissions. Invoice visibility does not imply client/service master-data access.
 - MVP1 intends one dedicated account with `ADMIN`; Krishna and working team members use `BILLING`; `VIEWER` is reserved for future read-only use.
 - The schema does not limit the number of ADMIN memberships. Future application/service logic must prevent removing or demoting the last active ADMIN in an organization.
 - No membership mutation service exists yet. Any future membership role/deactivation service must enforce the last-active-ADMIN invariant transactionally.
