@@ -4,6 +4,7 @@ import { AuthorizationError, hasPermission, OrganizationContextNotFoundError, Pr
 import { AuthenticationError } from "@/lib/auth/identity";
 import { loadInvoiceWorkspace, type InvoiceWorkspaceRow } from "@/lib/invoices/invoice-workspace";
 import { formatMoneyDisplay } from "@/lib/invoices/invoice-entry-ui";
+import { MasterDataLinks } from "@/components/master-data/workspace-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function InvoiceWorkspacePage({
 
   return <main className="entry-page entry-page-production invoice-workspace-page">
     <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><span>{workspace.organizationName}</span><span className="entry-workspace-user">{workspace.userLabel} · {workspace.role}</span></div>
+    <MasterDataLinks workspace={workspace} current="invoices" />
     <header className="entry-header">
       <div><div className="entry-eyebrow">INVOICES</div><div className="entry-title-row"><h1>Invoice Workspace</h1></div></div>
       {canCreate && <Link className="entry-button entry-button-primary" href={`${basePath}/new`}>+ New Invoice</Link>}

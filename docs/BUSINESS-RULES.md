@@ -7,6 +7,9 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - MVP1 has one organization: Hiiiive.
 - Organization-owned data must include `organizationId` to support a future multi-tenant SaaS product.
 - Client and Service master data have dedicated authorization: ADMIN and BILLING may read, create, and edit; VIEWER has no Client/Service master-data access. Invoice visibility does not imply master-data access.
+- Client and ClientContact edits affect current master data only. Issued invoice client snapshots remain unchanged; new drafts continue to use current active Client data.
+- Service default price and currency are prospective draft-entry conveniences. Updates do not change stored InvoiceItem descriptions, prices, or totals. A default is used only when explicitly requested and its currency matches the invoice; explicit item prices take precedence. No currency conversion occurs.
+- Client, ClientContact, and Service management has no hard-delete action. Active flags are used to deactivate records while preserving historical references.
 
 ## Invoice lifecycle and numbering
 

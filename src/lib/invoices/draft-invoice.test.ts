@@ -14,6 +14,7 @@ import {
   type UpdateFullDraftInvoiceInput,
 } from "./draft-invoice";
 import { issueInvoice } from "./issue-invoice";
+import { updateClient, updateService } from "@/lib/master-data/mutations";
 
 const prisma = getPrismaClient();
 const config = {
@@ -365,6 +366,37 @@ describe("draft invoice service (PostgreSQL integration)", () => {
     assert.equal(issued.subtotal.toString(), "3.3333");
     assert.equal(issued.grandTotal.toString(), "2.3333");
     assert.equal(item.lineTotal.toString(), "3.3333");
+  }));
+
+  it("keeps issued client and service snapshots unchanged after master-data edits", async () => withFixture(async ({ organizationId, clientId }) => {
+    const service = await prisma.service.create({ data: { organizationId, name: "Website Development", defaultUnitPrice: new Prisma.Decimal("50000"), currencyCode: "LKR" } });
+    const invoice = await createDraftInvoice(organizationId, { clientId, items: [{ description: "Website Development", quantity: "1", serviceId: service.id, useServiceDefaultPrice: true }] });
+    const issued = await issueInvoice(organizationId, invoice.id);
+    const before = await prisma.invoice.findFirstOrThrow({ where: { organizationId, id: invoice.id } });
+    const historicalItem = await prisma.invoiceItem.findFirstOrThrow({ where: { organizationId, invoiceId: invoice.id } });
+
+    await updateClient(organizationId, clientId, { name: "Draft client Updated", email: "updated@example.test", active: true });
+    await updateService(organizationId, service.id, { name: "Website Development", description: null, defaultUnitPrice: "50000", currencyCode: "LKR", active: false });
+
+    const storedInvoice = await prisma.invoice.findFirstOrThrow({ where: { organizationId, id: invoice.id } });
+    const storedItem = await prisma.invoiceItem.findFirstOrThrow({ where: { organizationId, invoiceId: invoice.id } });
+    assert.equal(storedInvoice.clientNameSnapshot, "Draft client");
+    assert.equal(issued.clientNameSnapshot, "Draft client");
+    assert.equal(storedInvoice.lifecycleStatus, before.lifecycleStatus);
+    assert.equal(storedInvoice.invoiceNumber, before.invoiceNumber);
+    assert.equal(storedInvoice.issuedAt?.toISOString(), before.issuedAt?.toISOString());
+    assert.equal(storedInvoice.paymentStatus, before.paymentStatus);
+    assert.equal(storedInvoice.subtotal.toString(), before.subtotal.toString());
+    assert.equal(storedInvoice.grandTotal.toString(), before.grandTotal.toString());
+    assert.equal(storedItem.description, historicalItem.description);
+    assert.equal(storedItem.quantity.toString(), historicalItem.quantity.toString());
+    assert.equal(storedItem.unitPrice.toString(), "50000");
+    assert.equal(storedItem.lineTotal.toString(), "50000");
+
+    await updateService(organizationId, service.id, { name: "Website Development Updated", description: null, defaultUnitPrice: "60000", currencyCode: "LKR", active: true });
+    const futureDraft = await createDraftInvoice(organizationId, { clientId, items: [{ description: "Website Development Updated", quantity: "1", serviceId: service.id, useServiceDefaultPrice: true }] });
+    const futureItem = await prisma.invoiceItem.findFirstOrThrow({ where: { organizationId, invoiceId: futureDraft.id } });
+    assert.equal(futureItem.unitPrice.toString(), "60000");
   }));
 });
 
