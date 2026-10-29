@@ -10,6 +10,8 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - Client and ClientContact edits affect current master data only. Issued invoice client snapshots remain unchanged; new drafts continue to use current active Client data.
 - Service default price and currency are prospective draft-entry conveniences. Updates do not change stored InvoiceItem descriptions, prices, or totals. A default is used only when explicitly requested and its currency matches the invoice; explicit item prices take precedence. No currency conversion occurs.
 - Client, ClientContact, and Service management has no hard-delete action. Active flags are used to deactivate records while preserving historical references.
+- Organization name is billing-workspace display data; the organization slug is read-only in settings. Invoice display name and payment/bank details belong to the versioned invoice template config and are independently managed. Settings require `ORGANIZATION_SETTINGS`; changes affect future previews and issued invoices only. Bank details are displayed on invoice documents and do not process payments.
+- The Hiiiive invoice settings surface exposes only the supported display name, primary color, and bank/account text fields. The renderer and fixed font pair remain unchanged. Secrets and email transport configuration remain deployment environment settings.
 
 ## Invoice lifecycle and numbering
 

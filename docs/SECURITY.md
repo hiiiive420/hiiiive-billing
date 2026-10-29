@@ -113,3 +113,9 @@ Record immutable audit events for important invoice actions, including actor, ti
 - This read surface performs no invoice, payment, email-attempt, numbering, or lifecycle writes.
 
 
+# Organization settings
+
+- The settings route and every settings Server Action independently resolve the route slug through `requireOrganizationBySlug()` and require centralized `ORGANIZATION_SETTINGS`. Organization IDs and template ownership are derived from this trusted context.
+- Mutations accept only the organization name or allowlisted Hiiiive display fields. Organization slug, role, permissions, renderer key, template/version IDs, and tenant ownership are never accepted as authoritative input. Template config JSON is not exposed to the browser.
+- Template configuration changes insert immutable versions while holding a row lock on the active default template. The issuance service's existing shared lock serializes issuance with settings saves. Historical issued invoices continue to render their bound template version.
+- Payment/bank values are invoice display data, not credentials or payment processing. SMTP, database, OpenAI, Cloudflare, and other deployment secrets remain outside the application settings UI.

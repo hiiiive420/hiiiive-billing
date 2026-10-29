@@ -12,12 +12,13 @@ export function MasterDataShell({ workspace, children, section }: { workspace: W
   </main>;
 }
 
-export function MasterDataLinks({ workspace, current }: { workspace: Workspace; current: "clients" | "services" | "invoices" }) {
+export function MasterDataLinks({ workspace, current }: { workspace: Workspace; current: "clients" | "services" | "invoices" | "settings" }) {
   const base = `/app/${encodeURIComponent(workspace.organizationSlug)}`;
   return <nav className="master-data-nav" aria-label="Workspace navigation">
     <Link aria-current={current === "invoices" ? "page" : undefined} href={`${base}/invoices`}>Invoice Workspace</Link>
     {hasPermission(workspace.role, "CLIENT_READ") && <Link aria-current={current === "clients" ? "page" : undefined} href={`${base}/clients`}>Clients</Link>}
     {hasPermission(workspace.role, "SERVICE_READ") && <Link aria-current={current === "services" ? "page" : undefined} href={`${base}/services`}>Services</Link>}
+    {hasPermission(workspace.role, "ORGANIZATION_SETTINGS") && <Link aria-current={current === "settings" ? "page" : undefined} href={`${base}/settings`}>Settings</Link>}
   </nav>;
 }
 

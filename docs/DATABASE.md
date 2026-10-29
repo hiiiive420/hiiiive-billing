@@ -112,6 +112,7 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 - `(organizationId, templateId, version)` is unique, and its composite FK enforces that the parent template belongs to the same organization. `(organizationId, id)` supports tenant-safe invoice references.
 - The issuance service rejects non-positive version numbers and validates the renderer key and structured config before reserving an invoice number. The database does not store executable JavaScript or arbitrary renderer code in config; it is structured presentation/branding data.
 - Invoices can reference a version using a nullable tenant-safe composite FK. Restrict deletion protects referenced versions, and the database trigger prevents deletion of all versions, including unreferenced ones.
+- Organization settings save invoice display/payment values by inserting a new version of the existing active default template. Saves lock the default template row in a transaction, serialize with issuance's `FOR SHARE` lock, preserve immutable history, and require no schema change.
 
 ### Money representation
 
