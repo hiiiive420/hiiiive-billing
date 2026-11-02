@@ -74,7 +74,7 @@ export type UpdateDraftInvoiceInput = Readonly<{
   paymentTerms?: string | null;
 }>;
 
-type PreparedItem = {
+export type PreparedDraftItem = {
   billingMode: "QUANTITY" | "FLAT_FEE";
   serviceId: string | null;
   description: string;
@@ -90,34 +90,38 @@ export async function createDraftInvoice(
   input: CreateDraftInvoiceInput,
 ): Promise<Invoice> {
   const prisma = getPrismaClient();
-  return prisma.$transaction(async (tx) => {
-    await requireActiveClient(tx, organizationId, input.clientId);
-    const currencyCode = normalizeCurrency(input.currencyCode ?? "LKR");
-    const items = await prepareItems(tx, organizationId, currencyCode, input.items);
-    const discountAmount = parseDecimal(input.discountAmount ?? "0", "Discount amount");
-    const totals = calculateAndValidateTotals(items, discountAmount);
+  return prisma.$transaction((tx) => createDraftInvoiceInTransaction(tx, organizationId, input));
+}
 
-    const invoice = await tx.invoice.create({
-      data: {
-        organizationId,
-        clientId: input.clientId,
-        projectTitle: input.projectTitle ?? null,
-        invoiceDate: validDate(input.invoiceDate, "Invoice date"),
-        dueDate: validDate(input.dueDate, "Due date"),
-        currencyCode,
-        discountLabel: input.discountLabel ?? null,
-        discountAmount,
-        subtotal: totals.subtotal,
-        grandTotal: totals.grandTotal,
-        notes: input.notes ?? null,
-        paymentTerms: input.paymentTerms ?? null,
-      },
-    });
-    await tx.invoiceItem.createMany({
-      data: items.map((item) => ({ ...item, organizationId, invoiceId: invoice.id })),
-    });
-    return invoice;
+/** Create a canonical unnumbered draft inside a caller-owned transaction. */
+export async function createDraftInvoiceInTransaction(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  input: CreateDraftInvoiceInput,
+): Promise<Invoice> {
+  await requireActiveClient(tx, organizationId, input.clientId);
+  const currencyCode = normalizeCurrency(input.currencyCode ?? "LKR");
+  const items = await prepareDraftInvoiceItems(tx, organizationId, currencyCode, input.items);
+  const discountAmount = parseDecimal(input.discountAmount ?? "0", "Discount amount");
+  const totals = calculateAndValidateDraftTotals(items, discountAmount);
+  const invoice = await tx.invoice.create({
+    data: {
+      organizationId,
+      clientId: input.clientId,
+      projectTitle: input.projectTitle ?? null,
+      invoiceDate: validDate(input.invoiceDate, "Invoice date"),
+      dueDate: validDate(input.dueDate, "Due date"),
+      currencyCode,
+      discountLabel: input.discountLabel ?? null,
+      discountAmount,
+      subtotal: totals.subtotal,
+      grandTotal: totals.grandTotal,
+      notes: input.notes ?? null,
+      paymentTerms: input.paymentTerms ?? null,
+    },
   });
+  await tx.invoiceItem.createMany({ data: items.map((item) => ({ ...item, organizationId, invoiceId: invoice.id })) });
+  return invoice;
 }
 
 /** Update draft header fields and recalculate totals from its persisted item inputs. */
@@ -138,7 +142,7 @@ export async function updateDraftInvoice(
       orderBy: [{ position: "asc" }, { id: "asc" }],
     });
     if (currentItems.length === 0) throw new DraftInvoiceError("A draft invoice must contain at least one item.");
-    const items: PreparedItem[] = currentItems.map((item) => {
+    const items: PreparedDraftItem[] = currentItems.map((item) => {
       const quantity = decimalFromDb(item.quantity);
       const unitPrice = decimalFromDb(item.unitPrice);
       if (unitPrice.isNegative()) {
@@ -163,7 +167,7 @@ export async function updateDraftInvoice(
     const discountAmount = input.discountAmount === undefined
       ? decimalFromDb(invoice.discountAmount)
       : parseDecimal(input.discountAmount, "Discount amount");
-    const totals = calculateAndValidateTotals(items, discountAmount);
+    const totals = calculateAndValidateDraftTotals(items, discountAmount);
 
     for (let index = 0; index < items.length; index += 1) {
       const item = items[index]!;
@@ -205,9 +209,9 @@ export async function replaceDraftInvoiceItems(
   return prisma.$transaction(async (tx) => {
     const invoice = await lockAndLoadDraft(tx, organizationId, invoiceId);
     const currencyCode = normalizeCurrency(invoice.currencyCode);
-    const items = await prepareItems(tx, organizationId, currencyCode, inputItems);
+    const items = await prepareDraftInvoiceItems(tx, organizationId, currencyCode, inputItems);
     const discountAmount = decimalFromDb(invoice.discountAmount);
-    const totals = calculateAndValidateTotals(items, discountAmount);
+    const totals = calculateAndValidateDraftTotals(items, discountAmount);
 
     await tx.invoiceItem.deleteMany({ where: { organizationId, invoiceId } });
     await tx.invoiceItem.createMany({
@@ -233,9 +237,9 @@ export async function updateFullDraftInvoice(
     await lockAndLoadDraft(tx, organizationId, invoiceId);
     await requireActiveClient(tx, organizationId, input.clientId);
     const currencyCode = normalizeCurrency(input.currencyCode);
-    const items = await prepareItems(tx, organizationId, currencyCode, input.items);
+    const items = await prepareDraftInvoiceItems(tx, organizationId, currencyCode, input.items);
     const discountAmount = parseDecimal(input.discountAmount, "Discount amount");
-    const totals = calculateAndValidateTotals(items, discountAmount);
+    const totals = calculateAndValidateDraftTotals(items, discountAmount);
 
     await tx.invoiceItem.deleteMany({ where: { organizationId, invoiceId } });
     await tx.invoiceItem.createMany({
@@ -299,16 +303,16 @@ async function requireActiveClient(
   if (!client) throw new DraftInvoiceError("An active client in this organization is required.");
 }
 
-async function prepareItems(
+export async function prepareDraftInvoiceItems(
   tx: Prisma.TransactionClient,
   organizationId: string,
   currencyCode: string,
   inputItems: readonly DraftInvoiceItemInput[],
-): Promise<PreparedItem[]> {
+): Promise<PreparedDraftItem[]> {
   if (!Array.isArray(inputItems) || inputItems.length === 0) {
     throw new DraftInvoiceError("A draft invoice must contain at least one item.");
   }
-  const prepared: PreparedItem[] = [];
+  const prepared: PreparedDraftItem[] = [];
   for (let index = 0; index < inputItems.length; index += 1) {
     const input = inputItems[index];
     if (!input || typeof input.description !== "string" || input.description.trim().length === 0) {
@@ -371,7 +375,7 @@ async function prepareItems(
   return prepared;
 }
 
-function calculateAndValidateTotals(items: readonly PreparedItem[], discountAmount: Prisma.Decimal) {
+export function calculateAndValidateDraftTotals(items: readonly PreparedDraftItem[], discountAmount: Prisma.Decimal) {
   if (discountAmount.isNegative()) throw new DraftInvoiceError("Discount amount cannot be negative.");
   const totals = calculateInvoiceTotals(items.map((item) => item.lineTotal), discountAmount);
   if (discountAmount.greaterThan(totals.subtotal)) {

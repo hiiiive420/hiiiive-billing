@@ -52,6 +52,16 @@ enum InvoiceEmailAttemptStatus {
   FAILED
 }
 
+enum RecurringInvoiceFrequency {
+  MONTHLY
+  YEARLY
+}
+
+enum RecurringInvoiceRunStatus {
+  GENERATED
+  FAILED
+}
+
 model Organization {
   id                      String                   @id @default(uuid()) @db.Uuid
   name                    String
@@ -70,6 +80,9 @@ model Organization {
   invoiceTemplates        InvoiceTemplate[]
   invoiceTemplateVersions InvoiceTemplateVersion[]
   invoiceEmailAttempts    InvoiceEmailAttempt[]
+  recurringInvoicePlans   RecurringInvoicePlan[]
+  recurringInvoiceItems   RecurringInvoiceItem[]
+  recurringInvoiceRuns    RecurringInvoiceRun[]
 }
 
 model User {
@@ -114,6 +127,7 @@ model Client {
   organization                        Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   contacts                            ClientContact[]
   invoices                            Invoice[]
+  recurringInvoicePlans               RecurringInvoicePlan[]
 
   // Enables a contact foreign key that enforces matching tenant and client.
   @@unique([organizationId, id])
@@ -150,6 +164,7 @@ model Service {
   updatedAt        DateTime      @updatedAt
   organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   invoiceItems     InvoiceItem[]
+  recurringInvoiceItems RecurringInvoiceItem[]
 
   // Enables invoice item foreign keys that enforce matching tenant and service.
   @@unique([organizationId, id])
@@ -189,6 +204,7 @@ model Invoice {
   targetRelations              InvoiceRelation[]       @relation("InvoiceRelationTarget")
   templateVersion              InvoiceTemplateVersion? @relation(fields: [organizationId, templateVersionId], references: [organizationId, id], onDelete: Restrict)
   emailAttempts                InvoiceEmailAttempt[]
+  recurringInvoiceRuns         RecurringInvoiceRun[]
 
   // Enables tenant-safe composite foreign keys from invoice items.
   @@unique([organizationId, id])
@@ -220,6 +236,74 @@ model InvoiceItem {
 
   @@index([organizationId, invoiceId, position])
   @@index([organizationId, serviceId])
+}
+
+model RecurringInvoicePlan {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  organizationId     String                    @db.Uuid
+  clientId           String                    @db.Uuid
+  name               String
+  projectTitle       String?
+  currencyCode       String                    @db.VarChar(3)
+  frequency          RecurringInvoiceFrequency
+  startDate          DateTime                  @db.Date
+  nextRunDate        DateTime                  @db.Date
+  isActive           Boolean                   @default(true)
+  dueInDays          Int?
+  discountLabel      String?
+  discountAmount     Decimal                   @default(0) @db.Decimal(19, 4)
+  paymentTerms       String?
+  notes              String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  organization       Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  client             Client                    @relation(fields: [organizationId, clientId], references: [organizationId, id], onDelete: Restrict)
+  items              RecurringInvoiceItem[]
+  runs               RecurringInvoiceRun[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, isActive, nextRunDate])
+  @@index([organizationId, name])
+}
+
+model RecurringInvoiceItem {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @db.Uuid
+  planId         String                 @db.Uuid
+  serviceId      String?                @db.Uuid
+  description    String
+  billingMode    InvoiceItemBillingMode @default(QUANTITY)
+  quantity       Decimal                @db.Decimal(19, 4)
+  unitPrice      Decimal                @db.Decimal(19, 4)
+  position       Int
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  plan           RecurringInvoicePlan   @relation(fields: [organizationId, planId], references: [organizationId, id], onDelete: Restrict)
+  service        Service?               @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, planId, position])
+  @@index([organizationId, serviceId])
+}
+
+model RecurringInvoiceRun {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  organizationId         String                    @db.Uuid
+  planId                 String                    @db.Uuid
+  scheduledFor            DateTime                  @db.Date
+  generatedInvoiceId     String?                   @db.Uuid
+  status                 RecurringInvoiceRunStatus
+  failureCode            String?
+  safeFailureMessage     String?
+  createdAt              DateTime                  @default(now())
+  completedAt            DateTime?
+  organization           Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  plan                   RecurringInvoicePlan      @relation(fields: [organizationId, planId], references: [organizationId, id], onDelete: Restrict)
+  generatedInvoice       Invoice?                  @relation(fields: [organizationId, generatedInvoiceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([planId, scheduledFor])
+  @@unique([generatedInvoiceId])
+  @@index([organizationId, planId, scheduledFor])
 }
 
 model InvoiceSequence {

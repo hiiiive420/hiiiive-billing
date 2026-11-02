@@ -1,87 +1,115 @@
 # Codex Handoff
 
 ## Task
-INV-029 — Production UX Polish & Application Consistency
+INV-030 — Recurring Invoice Automation + Draft Autosave & Issue Flow
 
 ## Status
-Implementation complete. No commit created. The server-side business rules, persistence, authorization, billing calculations, and invoice renderer were not changed.
+Implementation is present and the focused migration has been applied to the local development database. All automated checks completed successfully except the repository's default Turbopack build, which failed in its CSS child process; the webpack production build passed. No commit was created. Browser acceptance could not be performed because Chrome Computer Use was not approved.
 
 ## Repository Baseline
-Checkout: `D:\Billing_Hive\hiiiive-billing`
+Checkout: `D:\Billing_Hive\hiiiive-billing`.
 
-Baseline commit: `1b77495 feat: add organization and invoice settings` (`HEAD`, `main`, and `origin/main` at start).
+At task start, the worktree was clean and `main`, `origin/main`, and `origin/HEAD` were at `4c205a7 feat: polish production application ux` (INV-029). No commit or push was made for INV-030.
 
-The operator-verified checkout is a healthy worktree. Codex's `git status --short` returned the documented false worktree error; Git metadata was not changed. Operator will verify the final status/diff externally.
+## Schema / Migration
+Added `RecurringInvoicePlan`, `RecurringInvoiceItem`, and `RecurringInvoiceRun`, plus monthly/yearly and generated/failed enums. Added tenant-safe client/service/plan/invoice relations and a database unique index on `(planId, scheduledFor)`; generated invoice relation is unique. Migration: `20261102090000_recurring_invoice_automation`.
 
-## Initial Visual Audit
-The root page was a dead-end brand label. Workflow pages used inconsistent headers and navigation. Invoice filters wrapped awkwardly around medium widths, invoice KPI cards stayed four-up too long, and master-data pages repeated their titles. Status styling varied across invoice, payment, email, and master-data contexts. Issued invoice payment summary formed a loose horizontal strip. Mobile navigation/record cards needed a predictable wrap and narrower layouts.
+## Permissions
+Added `RECURRING_INVOICE_READ` and `RECURRING_INVOICE_MANAGE`. ADMIN and BILLING receive both. VIEWER receives neither. Routes/actions use centralized `requireOrganizationBySlug()` checks.
 
-## Root Route
-`/` uses Next server `redirect("/app")`. Existing `/app` organization/membership routing remains authoritative.
+## Draft Autosave Threshold
+First production save waits for an active selected client, a valid three-letter currency, and at least one described item with valid quantity and nonnegative unit price, or valid flat-fee amount. Zero price remains allowed. Project title, dates, terms, notes, discount, service selection, and AI are optional. A project title or client alone creates no row.
 
-## Application Shell / Navigation
-Added `WorkspaceHeader` and `MasterDataShell` in `src/components/master-data/workspace-shell.tsx`. Invoices, invoice entry/edit/preview/detail/send/payment flows, clients, services, and settings share the organization/user/role header and permission-gated area navigation. Workflow pages include contextual links/breadcrumbs.
+## First Autosave
+After a 950 ms debounce, the canonical `createDraftInvoice()` creates an unnumbered DRAFT. Client form state is retained while the browser URL changes to `/invoices/{draftId}/edit` through `history.replaceState()`.
 
-## Shared UI System
-Added shared `StatusChip` in `src/components/status-chip.tsx`; used for lifecycle, payment, email, and active/inactive states. Shared status colors and focus behavior were added to application CSS. Existing disabled semantics and form labels remain.
+## Subsequent Autosave / Concurrency
+Edits serialize through one in-flight promise, with the latest form revision coalesced and saved afterward to the same draft using `updateFullDraftInvoice()`. Failure preserves browser state, shows an inline error, and exposes Save now. A lightweight `beforeunload` warning covers pending/failed changes to an existing draft.
 
-## Invoice Workspace
-Retained query behavior, filters, sorting, pagination, counts, and row/card actions. Summary cards become two columns at medium widths. Filters use predictable search/filter/action placement; invoice cards collapse to one column below tablet widths.
+## Invoice Action / Issue Flow
+New and existing production drafts show autosave status, Preview, Save now, and Issue Invoice when a persisted draft is saved. Preview and issue wait for the latest save. Issue calls only the existing `issueInvoice()` action and remains explicitly confirmed. If issue fails after save, the DRAFT remains and the UI says it was saved. Generated recurring drafts use this same editor, preview, and issue flow.
 
-## Invoice Entry
-Shared workspace header now appears in new/edit invoice routes. Existing single-page workflow and AI actions are preserved. Entry behavior and calculations were not changed.
+## Routes / Navigation
+Added `/app/[organizationSlug]/recurring`, `/recurring/new`, and `/recurring/[planId]`, with permission-gated Recurring navigation. Plan detail supports edit, pause/resume, and linked run history. Issued invoice actions keep Send Invoice primary, Record Payment accent, and PDF/payments links secondary; invoice breadcrumb link is quiet.
 
-## Draft / Issued Invoice Views
-Issued invoice page includes shared shell, document context, status chips, and separate navigation/action treatments. Draft preview received the same application chrome and clear draft context. Invoice renderer/PDF content remain unchanged.
+## Recurring Plan Model
+Plan is organization/client scoped and stores name, project, currency, frequency, start and next-run dates, active state, due offset, discount, terms, and notes. Search is bounded and case-insensitive across plan name, client, and project.
 
-No draft invoice existed in the local organization, so edit-draft and draft-preview routes could not be exercised against an existing record.
+## Recurring Items
+Relational items store description, billing mode, exact Decimal quantity/unit price, position, and an optional tenant-safe Service reference. Flat fee uses canonical quantity one. Plan price values do not inherit future Service defaults.
 
-## Send Invoice
-Send route uses the workspace shell, invoice breadcrumbs, and shared status chips. Email content, recipient behavior, and send actions were not changed.
+## Monthly Scheduling
+Preserves the start-date day anchor. Short months clamp to their last day; later months return to the original anchor (Jan 31 → Feb 28/29 → Mar 31).
 
-## Payments
-Payment route uses the common shell and navigation. Issued-invoice payment summary is a responsive grid aligned with the A4 document width. Payment recording/history behavior is unchanged.
+## Yearly Scheduling
+Preserves the start-date month/day. A Feb 29 anchor maps to Feb 28 in non-leap years and returns to Feb 29 in leap years.
 
-## Clients / Contacts
-Client list/detail use the common shell and status chips for clients and contacts. Existing create form and seeded client detail rendered. Contact fields, scoping, and mutations were not changed.
+## Asia/Colombo Date Rules
+Runner derives the current date in `Asia/Colombo`; all recurrence and stored schedule dates are calendar `DATE` values. No UTC-server local-time arithmetic is used.
 
-## Services
-Service list/detail use the common shell and status chips. Existing create form and seeded service detail rendered. Service fields and persistence were not changed.
+## Draft Generation
+Server-only runner calls the canonical draft creator within its generation transaction. It copies plan terms/items into a normal unnumbered DRAFT with scheduled invoice date and optional due offset. It does not issue, number, freeze a template, email, or create payments.
 
-## Settings
-Settings uses common navigation. Existing settings form and sample preview remain intact; no settings fields, template versioning, validation, or renderer behavior changed.
+## Idempotency / Concurrency
+Runner locks each due plan row, checks its unique occurrence row, and atomically commits invoice/items, run history, and nextRunDate. At most one overdue occurrence per plan is processed in one runner execution. The database unique occurrence index is the final duplicate guard.
 
-## Responsive Behavior
-Reviewed application routes and existing client/service detail and create forms at 1440px, 1024px, 768px, and 390px. No page-level horizontal overflow was observed. Navigation wraps on mobile; invoice and master-data cards become single-column at narrower widths; settings preview remains contained.
+## Pause / Resume
+Pause preserves plan, anchor, runs, invoices, and any future nextRunDate. Resume keeps that future date; if it passed while paused, it selects the first anchored occurrence after today in Colombo time. Historical missed periods are not replayed. Active plan edits recompute the next future occurrence.
 
-## Accessibility
-Workspace navigation has a landmark label and active-page state. Permission gating is preserved. Focus indicators remain visible; existing labels and semantic controls are retained. Navigation/back links remain links rather than action buttons.
+## Run History
+Run ledger records scheduled date, status, safe failure code/message, completion time, and relational generated-invoice link. Plan detail links DRAFT runs to the normal edit route and issued invoices to their normal invoice route. Inactive clients produce a safe failed run and do not advance the date; later runs retry that occurrence.
 
-## Browser Acceptance
-The app was already running at `http://localhost:3000` and was inspected in the in-app browser. `/` and `/app` both resolved to the invoice workspace through existing authorization routing. Inspected invoice workspace, new invoice, issued invoice, send, payments, clients, client detail/create, services, service detail/create, and settings/preview at target widths. Existing issued record `I202610231` and seeded master-data records were viewed without changing data.
+## Scheduler / Cron Endpoint
+Added `POST /api/internal/recurring-invoices/run`, authenticated with `Authorization: Bearer ...` using constant-time comparison. Secret boundary is `RECURRING_INVOICE_CRON_SECRET` in the server environment only; `.env.example` contains an empty placeholder. Production should call the endpoint once daily.
 
-Edit draft/draft preview could not be inspected because the organization has no draft invoices. Invoice issue, send, and payment mutations were not submitted.
+## Security / Tenant Isolation
+Every recurring read/mutation derives the organization from the authenticated active membership. Plan items enforce same-organization Service references; clients are revalidated as active at generation; invoices/runs keep tenant-safe relations. Cron runs from persisted organization data and returns safe errors. No role or organization ID is accepted as authority from the browser.
 
-## Business Logic Impact
-Presentational changes only. No schema, migration, tenant/auth/RBAC policy, invoice math/lifecycle, payment, email delivery, AI, master-data, settings persistence, or renderer behavior was changed.
+## Financial Safety
+Recurring form validation reuses draft item preparation, exact Prisma Decimal math, and canonical discount bounds. Generated drafts are created by the canonical draft service. Schedule and draft generation do not touch InvoiceSequence, historical invoices/items, payments, email attempts, clients, or service defaults.
+
+## Responsive UI
+Recurring table is horizontally contained in its own scroll region; plan forms reuse the invoice workspace layout and app shell. Automated browser checks at 1440/1024/768/390 were not completed because Chrome Computer Use was not approved for this turn.
 
 ## Tests and Checks
-- `git diff --check`: passed (Git reported expected LF-to-CRLF working-copy warnings).
+- `npx prisma validate`: passed.
 - `npm run typecheck`: passed.
 - `npm run lint`: passed.
+- Invoice autosave-threshold and recurrence schedule tests: 17 passed.
+- Recurring PostgreSQL integration test: passed (concurrent idempotency, no-number DRAFT, and prospective price update).
+- Full `npm test`: 175 passed; PDF suite 8 passed.
+- `npm run build`: Turbopack failed while spawning its CSS worker. `npx next build --webpack`: passed, and output lists the recurring pages and internal cron route.
 - `npm audit --omit=dev`: passed, 0 vulnerabilities.
-- `npm test`: failed because PostgreSQL at `localhost:5432` is unavailable; PostgreSQL integration suites could not run. Renderer unit tests passed in the same run.
-- `node --import tsx --test src/lib/invoice-templates/generate-pdf.test.ts`: 7 passed; the PDF launch test failed because Puppeteer could not launch the configured browser process (Windows error code `2147483651`).
-- `npm run db:migrate:status`: unable to inspect migration status; Prisma schema engine could not connect to the local database.
-- `npm run build`: failed in Turbopack while spawning the CSS processing child process (`node process exited before we could connect`). Retrying `npx next build --webpack` failed with `EPERM` creating generated `.next/types/...` output. TypeScript and lint checks passed.
-- No migration was created.
+- `git diff --check`: passed (Git reports expected LF-to-CRLF working-copy warnings).
 
 ## Migration Status
-No migration expected or created. Local migration status is unverified because PostgreSQL is unavailable.
+Prisma migration `20261102090000_recurring_invoice_automation` was created and applied successfully to local `hiiiive_billing`. `npm run db:migrate:status`: database schema is up to date (14 migrations found).
 
-## Remaining UX / QA Notes
-Draft-only screens require a draft record for live browser QA. Re-run PostgreSQL-backed tests and migration status with the local database available. Re-run the production build in an environment where the Next.js CSS child process and `.next` output directory are permitted. Browser console event capture was unavailable through the current in-app browser interface; no visible runtime error UI was encountered.
+## Deployment Requirement
+Set a long random `RECURRING_INVOICE_CRON_SECRET` in production secret management and schedule one daily POST to `/api/internal/recurring-invoices/run` with the matching bearer token. Do not place the secret in Settings DB, client code, or logs.
+
+## Limitations / Next Step
+The Chrome UI permission request timed out and a retry reported that Chrome was not approved, so no browser acceptance was performed. No invoice was issued or emailed. The repository's default Turbopack build remains environment-blocked; use the successful webpack build result for route verification.
 
 Suggested next step:
 
 QA-001 — Production Readiness / Security / End-to-End Acceptance
+
+## INV-030B — Recurring Plan Save and Payment Navigation
+
+The recurring create failure was caused by the flat-fee amount arriving as the formatted string `55,000`. The existing `prepareDraftInvoiceItems()` Decimal parser intentionally accepts canonical decimal strings and rejected grouping punctuation; the Server Action then returned the generic fallback because it did not classify `DraftInvoiceError` as a safe validation message. `saveRecurringPlanAction()` now validates and canonicalizes correctly grouped values (`55,000` → `55000`) before service validation, without floating-point conversion. Malformed grouping returns an item-specific validation message. Known draft validation messages are returned safely; unexpected save errors are logged only in development.
+
+The plan service now requires an active client in the trusted organization. Regression coverage exercises the exact monthly LKR example (canonical 2026-11-10 start date, 14-day due offset, zero discount, blank optional fields, flat-fee 55,000, no Service), verifies stored quantity 1 and exact Decimal price, and confirms plan creation does not create invoices, invoice sequences, payments, or email attempts. The test also proves the raw grouped amount fails at the Decimal service boundary and normalization fixes it. Existing inactive-client runner coverage now deactivates the client only after creating a valid plan.
+
+The controlled browser date input already provides `YYYY-MM-DD` through `e.target.value`; the action passes that string unchanged, and recurring schedule calculations remain timezone-safe and Asia/Colombo calendar-based. Payment navigation now shows only the invoice-specific back link; review found no other duplicate contextual invoice links in subordinate invoice pages. Global Invoices navigation remains in the workspace header.
+
+INV-030B checks: `npx prisma validate`, `npm test` (183 tests plus 8 PDF tests), `npm run typecheck`, `npm run lint`, `npm run db:migrate:status` (14 migrations; schema up to date), `npm audit --omit=dev` (0 vulnerabilities), and `git diff --check` passed. The local recurring plan integration regression passed against PostgreSQL. Manual acceptance was completed in the Codex built-in browser: the exact SESo2/LKR/monthly flat-fee plan saved and opened its detail page; the list showed next run `2026-11-10`; and the issued invoice Payments page showed one contextual “← Back to Invoice” link and no duplicate “Back to Invoices” link. No migration was created for INV-030B. Changes remain uncommitted.
+
+## INV-030A — Recurring Retry / Autosave Acceptance Audit
+The existing recurring retry implementation reuses the unique `(planId, scheduledFor)` FAILED occurrence while holding the plan row lock. A PostgreSQL regression covers inactive Client → reactivation → concurrent retry: exactly one run transitions to GENERATED, exactly one ordinary DRAFT is associated, and `nextRunDate` advances once. A later run creates neither a second occurrence nor Draft. No recurrence migration or scheduling changes were needed.
+
+Cron review found malformed Authorization values could previously pass if the raw configured secret was sent without a Bearer scheme. The endpoint now requires exactly one Bearer token; absent, malformed, wrong, or different-length credentials fail safely. Comparison remains timing-safe, the secret stays server-only, and no browser session authorization is used. Route auth regression tests cover these cases and ensure the secret is not returned.
+
+Autosave single-flight regression confirms rapid first triggers share one create and establish one draft ID; later saves update that draft. A persisted edit read-model assertion verifies the created Draft can be reloaded from the normal edit route after refresh. Preview and issue both await `saveLatest`; failed saves stop the action, while a saved Draft remains intact if issuance fails. `issueInvoice()` financial and sequence behavior was not changed. Browser refresh was not manually exercised because the prior Chrome UI permission was unavailable.
+
+INV-030A checks: focused autosave/cron tests passed; recurring and invoice action PostgreSQL tests passed; full `npm test` passed (180 tests plus 8 PDF tests); `npx prisma validate`, `npm run typecheck`, `npm run lint`, `npm run db:migrate:status`, `npm audit --omit=dev` (0 vulnerabilities), and `git diff --check` passed. Database is up to date with 14 migrations; no new migration was added. Changes remain uncommitted.

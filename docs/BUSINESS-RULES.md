@@ -100,7 +100,12 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 
 ## Recurring invoices
 
-- Recurring templates generate drafts, not issued invoices.
+- Monthly and yearly organization-scoped recurring plans generate ordinary editable drafts, not issued invoices.
+- Recurring items freeze their own descriptions and prices. Service default price changes do not change an existing recurring agreement; plan edits apply prospectively and never rewrite generated drafts or historical invoices.
+- Monthly plans preserve the start-date day anchor; yearly plans preserve its month/day anchor. Short months clamp to their last day and a February 29 yearly anchor returns to February 29 in leap years. Recurrence uses Asia/Colombo calendar dates.
+- A daily runner processes at most one due occurrence per plan per execution. The database enforces one run per plan and scheduled date. A failed client check records a safe failure and leaves the occurrence due for retry.
+- Pausing preserves the plan, its schedule anchor, runs, invoices, and any future nextRunDate. If that date passes while paused, resuming selects the next anchored occurrence after the current Asia/Colombo date; missed occurrences are not replayed as a backlog.
+- Recurring generation does not issue, allocate an invoice number, send email, or create a payment. A human must review and issue every generated draft.
 - Client invoices require internal approval before sending in MVP1.
 - Draft generation must be idempotent: retrying a generation period must not create duplicate drafts.
 - Price changes apply prospectively and must not modify historical invoices.

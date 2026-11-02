@@ -25,14 +25,13 @@ export default async function InvoicePaymentsPage({ params }: { params: Promise<
     if (error instanceof InvoicePaymentReadModelError && /not found/i.test(error.message)) notFound();
     return <main className="entry-page entry-page-production"><section className="app-workspace-card" role="alert"><h1>Payments unavailable</h1><p>{error instanceof InvoicePaymentReadModelError ? error.message : "We couldn't load payment information."}</p></section></main>;
   }
-  const basePath = `/app/${encodeURIComponent(workspace.organizationSlug)}/invoices`;
-  const invoiceHref = `${basePath}/${encodeURIComponent(invoiceId)}`;
+  const invoiceHref = `/app/${encodeURIComponent(workspace.organizationSlug)}/invoices/${encodeURIComponent(invoiceId)}`;
   const canRecord = hasPermission(workspace.role, "PAYMENT_RECORD") && summary.lifecycleStatus === "ISSUED";
   const action = recordOrganizationInvoicePaymentAction.bind(null, workspace.organizationSlug, invoiceId);
   const defaultDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   return <main className="entry-page entry-page-production invoice-payments-page">
     <WorkspaceHeader workspace={workspace} current="invoices" />
-    <nav className="invoice-payment-breadcrumbs" aria-label="Invoice navigation"><Link href={invoiceHref}>← Back to Invoice</Link><Link href={basePath}>Back to Invoices</Link></nav>
+    <nav className="invoice-payment-breadcrumbs" aria-label="Invoice navigation"><Link href={invoiceHref}>← Back to Invoice</Link></nav>
     <header className="entry-header invoice-payment-header"><div><div className="entry-eyebrow">PAYMENTS</div><div className="entry-title-row"><h1>{summary.invoiceNumber ?? "Invoice"}</h1><StatusChip status={summary.lifecycleStatus} /></div><p className="invoice-payment-client">Client: {summary.clientName}</p></div></header>
     <section className="invoice-payment-summary" aria-label="Payment summary">
       <article><span>Payment Status</span><StatusChip status={summary.paymentStatus} /></article>

@@ -134,6 +134,10 @@ describe("production invoice Server Actions (PostgreSQL integration)", () => {
       assert.equal(persisted.paymentStatus, "UNPAID");
       assert.equal(persisted.invoiceNumber, null);
       assert.equal(persisted.grandTotal.toString(), "55028");
+      const reloadedAfterFirstSave = await loadDraftInvoiceForEditing(org.id, created.invoiceId);
+      assert.equal(reloadedAfterFirstSave.id, created.invoiceId);
+      assert.equal(reloadedAfterFirstSave.projectTitle, "Production draft");
+      assert.equal(reloadedAfterFirstSave.items.length, 3);
       const createdItems = await prisma.invoiceItem.findMany({ where: { invoiceId: created.invoiceId }, orderBy: { position: "asc" } });
       assert.deepEqual(createdItems.map((item) => item.billingMode), ["QUANTITY", "FLAT_FEE", "QUANTITY"]);
       assert.equal(createdItems[0]?.unitPrice.toString(), "12.5");

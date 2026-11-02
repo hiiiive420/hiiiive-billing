@@ -112,6 +112,15 @@ Record immutable audit events for important invoice actions, including actor, ti
 - Create, draft-edit, send, view, and PDF links are gated by centralized permissions where appropriate. Every destination continues to authorize independently on the server; hiding a link is not the security boundary.
 - This read surface performs no invoice, payment, email-attempt, numbering, or lifecycle writes.
 
+## Recurring invoices and autosave
+
+- Production recurring pages resolve the organization slug through `requireOrganizationBySlug()` and require `RECURRING_INVOICE_READ`; plan create/edit/pause/resume Server Actions independently require `RECURRING_INVOICE_MANAGE`. ADMIN and BILLING have both permissions; VIEWER has neither.
+- Plan reads, mutations, client/service references, and run history are scoped by the trusted organization ID. Browser input cannot set organization ownership, schedule dates beyond the validated plan start date, run status, generated invoice relation, or invoice totals.
+- The recurring runner is server-only and has no browser identity dependency. The internal POST endpoint requires a bearer token matching `RECURRING_INVOICE_CRON_SECRET`; comparison uses `timingSafeEqual`. The secret is configured only in the server environment and is never stored in application settings or returned in errors.
+- Generation locks the organization-owned plan row and commits the ordinary draft, unique occurrence run, and next run date in one transaction. The database unique constraint on `(planId, scheduledFor)` prevents duplicates. Only fixed safe failure messages are persisted; no stack traces are recorded.
+- Generated drafts call the canonical draft service, so client/service tenant checks and financial Decimal validation are unchanged. The runner never calls `issueInvoice()`, reserves a number, sends email, creates payment rows, or changes master data.
+- Production invoice autosave waits for an active selected same-organization client, valid three-letter currency, and one described item with valid quantity/price or flat-fee amount before creating the first DRAFT. Subsequent saves call the locked atomic full-draft update, are serialized/coalesced in the browser, and leave failed work in the form for retry. Issue remains an explicit action and waits for successful persistence first.
+
 
 # Organization settings
 

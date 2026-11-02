@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { hasPermission } from "@/lib/auth/authorization";
 
 type Workspace = { organizationSlug: string; organizationName: string; userLabel: string; role: string };
-type WorkspaceArea = "invoices" | "clients" | "services" | "settings";
+type WorkspaceArea = "invoices" | "clients" | "services" | "recurring" | "settings";
 
 export function WorkspaceHeader({ workspace, current }: { workspace: Workspace; current: WorkspaceArea }) {
   const base = `/app/${encodeURIComponent(workspace.organizationSlug)}`;
@@ -17,6 +17,7 @@ export function WorkspaceHeader({ workspace, current }: { workspace: Workspace; 
       {hasPermission(workspace.role, "INVOICE_READ") && <Link aria-current={current === "invoices" ? "page" : undefined} href={`${base}/invoices`}>Invoices</Link>}
       {hasPermission(workspace.role, "CLIENT_READ") && <Link aria-current={current === "clients" ? "page" : undefined} href={`${base}/clients`}>Clients</Link>}
       {hasPermission(workspace.role, "SERVICE_READ") && <Link aria-current={current === "services" ? "page" : undefined} href={`${base}/services`}>Services</Link>}
+      {hasPermission(workspace.role, "RECURRING_INVOICE_READ") && <Link aria-current={current === "recurring" ? "page" : undefined} href={`${base}/recurring`}>Recurring</Link>}
       {hasPermission(workspace.role, "ORGANIZATION_SETTINGS") && <Link aria-current={current === "settings" ? "page" : undefined} href={`${base}/settings`}>Settings</Link>}
     </nav>
   </div>;

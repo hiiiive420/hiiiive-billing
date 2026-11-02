@@ -28,6 +28,8 @@ body {
 .invoice-document-context nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #849194; font-size: 11px; }
 .invoice-document-context nav a { color: #347467; font-weight: 600; text-decoration: none; }
 .invoice-document-context nav a:hover { text-decoration: underline; }
+.invoice-document-context nav a.invoice-quiet-link { color: #849194; font-weight: 500; }
+.invoice-document-context nav a.invoice-quiet-link:hover { color: #347467; }
 .invoice-document-title { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 6px; }
 .invoice-document-title h1 { margin: 0; color: #25343a; font-size: 18px; line-height: 1.25; }
 .invoice-document-context p { margin: 5px 0 0; color: #657477; font-size: 12px; }
@@ -39,6 +41,8 @@ body {
 
 .document-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
 .document-actions .issue-control { display: flex; align-items: center; }
+.entry-button-accent { color: #fff; background: #397b68; border: 1px solid #397b68; }
+.entry-button-accent:hover { background: #2f6858; }
 .issue-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 720px; }
 .issue-confirm p { flex-basis: 100%; margin: 0 0 4px; }
 .issue-control .entry-error { margin: 0; }

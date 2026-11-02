@@ -94,6 +94,23 @@ The schema does not enforce that there is only one ADMIN. Future application/ser
 - Composite foreign keys require both the invoice and requester membership to belong to `organizationId`. Indexes support recent invoice attempt history and requester history.
 - `PENDING` may transition once to a terminal state. A PostgreSQL check constraint enforces status/timestamp consistency; a trigger rejects deletion, snapshot edits, and all terminal-row mutation. Resends create new rows. SMTP runs outside transactions; this table does not mutate the invoice or payment state.
 
+### RecurringInvoicePlan
+
+- Organization-owned recurring agreement linked to an organization Client through `(organizationId, clientId)`. It stores name, optional project title, currency, `MONTHLY`/`YEARLY` frequency, original calendar `startDate`, persisted `nextRunDate`, active/paused state, optional due-day offset, discount, payment terms, and notes.
+- `nextRunDate` is a PostgreSQL `DATE` and recurrence uses Asia/Colombo calendar days. Schedule calculations preserve the original start-date day or month/day anchor, clamping to the target month's last day. Resume selects the next anchored date after Colombo today without replaying missed periods.
+- Plan edits affect future generation. Already created Invoice and InvoiceItem rows are copies and are not rewritten by plan changes.
+
+### RecurringInvoiceItem
+
+- Organization- and plan-owned recurring line definition with description, `InvoiceItemBillingMode`, exact Decimal quantity and unit price, position, and optional tenant-safe Service reference.
+- Flat fees store canonical quantity `1` and amount in `unitPrice`, matching InvoiceItem semantics. Explicit plan values are price-frozen and never inherit a later Service default.
+
+### RecurringInvoiceRun
+
+- Durable occurrence ledger with organization, plan, `scheduledFor` DATE, status, optional safe failure code/message, completion time, and nullable relational generated Invoice link.
+- Unique `(planId, scheduledFor)` enforces exactly one ledger entry per occurrence; generated invoice ID is also unique. The generation transaction locks the plan and commits DRAFT invoice/items, run relation, and nextRunDate together. A due plan processes at most one occurrence per runner execution.
+- Failed inactive-client runs do not advance the plan. Later runs may retry the same occurrence. Run history retains generated draft/invoice links.
+
 ### InvoiceRelation
 
 - Organization-scoped historical relation with source and target invoice IDs, `InvoiceRelationType` (`REPLACED_BY`), reason, and creation timestamp.
@@ -127,11 +144,11 @@ Every business record in this schema belongs to an organization. Tenant identifi
 The following entities and relationships remain design guidance only; they are not implemented in the Prisma schema yet:
 
 - **Invoice** â€” organization/client-owned financial snapshot with draft/issued lifecycle.
-- **Recurring invoice template** â€” organization/client-owned source for idempotently generated drafts.
+- Recurring invoice plans/items/runs are implemented in the current schema and documented above.
 - **Approval** â€” records internal approval before an invoice can be sent.
 - **Audit event** â€” immutable record of important actions, actor, timestamp, action, and relevant reason/metadata.
 
-These future entities must follow the business and security requirements in `BUSINESS-RULES.md` and `SECURITY.md`. Their exact persistence and accounting treatment remain future implementation decisions. Approval, generalized audit events, and recurring templates are not implemented. Email send attempts are implemented by `InvoiceEmailAttempt`.
+Future entities must follow the business and security requirements in `BUSINESS-RULES.md` and `SECURITY.md`. Approval and generalized audit events are not implemented. Email send attempts are implemented by `InvoiceEmailAttempt`.
 
 
 

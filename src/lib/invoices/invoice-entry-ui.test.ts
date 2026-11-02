@@ -6,6 +6,7 @@ import {
   currencyChangeWarningVisible,
   formatMoneyDisplay,
   itemHasMeaningfulContent,
+  hasMeaningfulDraftAutosaveThreshold,
   devInvoiceEntryAvailable,
   mapDraftItemToEntryState,
   mapDraftInvoiceToEntryInitialState,
@@ -27,6 +28,17 @@ describe("invoice entry form helpers", () => {
     const empty = { billingMode: "QUANTITY" as const, serviceId: null, description: "", quantity: "1", unitPrice: "", amount: "", useServiceDefaultPrice: false };
     assert.equal(itemHasMeaningfulContent(empty), false);
     assert.equal(itemHasMeaningfulContent({ ...empty, description: "Design" }), true);
+  });
+
+  it("waits for an active client, valid currency, and one canonically valid described item before first autosave", () => {
+    const base = { billingMode: "QUANTITY" as const, serviceId: null, description: "", quantity: "1", unitPrice: "", amount: "", useServiceDefaultPrice: false };
+    assert.equal(hasMeaningfulDraftAutosaveThreshold(false, "LKR", [{ ...base, description: "Design", unitPrice: "20" }]), false);
+    assert.equal(hasMeaningfulDraftAutosaveThreshold(true, "BAD1", [{ ...base, description: "Design", unitPrice: "20" }]), false);
+    assert.equal(hasMeaningfulDraftAutosaveThreshold(true, "LKR", [{ ...base, description: "Design" }]), false);
+    assert.equal(hasMeaningfulDraftAutosaveThreshold(true, "LKR", [{ ...base, description: "Design", unitPrice: "-1" }]), false);
+    assert.equal(hasMeaningfulDraftAutosaveThreshold(true, "LKR", [{ ...base, description: "Design", quantity: "0", unitPrice: "20" }]), false);
+    assert.equal(hasMeaningfulDraftAutosaveThreshold(true, "LKR", [{ ...base, description: "Design", unitPrice: "0" }]), true);
+    assert.equal(hasMeaningfulDraftAutosaveThreshold(true, "LKR", [{ ...base, billingMode: "FLAT_FEE", description: "Monthly", amount: "55000" }]), true);
   });
 
   it("keeps the invoice entry route unavailable in production", () => {

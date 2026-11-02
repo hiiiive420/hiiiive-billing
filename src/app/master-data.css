@@ -90,3 +90,19 @@
   .app-workspace-chrome .master-data-nav a { min-height: 38px; display: inline-flex; align-items: center; }
   .master-data-search .entry-button { flex: 1; justify-content: center; }
 }
+
+.recurring-table-wrap { width: 100%; overflow-x: auto; }
+.recurring-table { width: 100%; border-collapse: collapse; min-width: 760px; font-size: 13px; }
+.recurring-table th, .recurring-table td { padding: 12px 10px; border-bottom: 1px solid #e9eeec; text-align: left; vertical-align: top; }
+.recurring-table th { color: #647477; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.recurring-table td a { color: #286b5d; font-weight: 600; }
+.recurring-table td small { display: block; margin-top: 4px; color: #778487; font-weight: 400; }
+.recurring-items { margin: 20px 0; }
+.recurring-item { margin: 12px 0; padding: 14px; border: 1px solid #e4ebe8; border-radius: 12px; }
+.entry-save-status { color: #647477; font-size: 12px; white-space: nowrap; }
+.entry-button-accent { font-weight: 600; }
+@media (max-width: 600px) {
+  .recurring-table { min-width: 720px; }
+  .recurring-item { padding: 10px; }
+  .entry-save-status { width: 100%; }
+}

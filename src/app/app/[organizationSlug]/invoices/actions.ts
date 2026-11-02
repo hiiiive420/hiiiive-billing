@@ -91,7 +91,8 @@ export async function updateOrganizationDraftAction(organizationSlug: string, in
   }
 }
 
-export async function issueOrganizationInvoiceAction(organizationSlug: string, invoiceId: string) {
+export async function issueOrganizationInvoiceAction(organizationSlug: string, invoiceId?: string) {
+  if (!invoiceId) return { ok: false as const, error: "Save the draft before issuing it." };
   let organizationId: string;
   try {
     ({ organizationId } = await requireOrganizationBySlug(organizationSlug, "INVOICE_ISSUE"));

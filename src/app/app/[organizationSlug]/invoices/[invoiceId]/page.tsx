@@ -39,7 +39,7 @@ export default async function IssuedInvoicePage({ params }: { params: Promise<{ 
     <WorkspaceHeader workspace={workspace} current="invoices" />
     <header className="preview-banner invoice-document-toolbar">
       <div className="invoice-document-context">
-        <nav aria-label="Breadcrumb"><Link href={workspaceHref}>Invoices</Link><span aria-hidden="true">/</span><span>{document.invoice.invoiceNumber}</span></nav>
+        <nav aria-label="Breadcrumb"><Link className="invoice-quiet-link" href={workspaceHref}>Invoices</Link><span aria-hidden="true">/</span><span>{document.invoice.invoiceNumber}</span></nav>
         <div className="invoice-document-title"><h1>{document.invoice.invoiceNumber}</h1><StatusChip status={document.lifecycleStatus} /><StatusChip status={document.paymentStatus} /></div>
       </div>
       <div className="document-actions">
@@ -52,7 +52,7 @@ export default async function IssuedInvoicePage({ params }: { params: Promise<{ 
       <dl><div><dt>Invoice Total</dt><dd>{paymentSummary.currencyCode} {formatMoneyDisplay(paymentSummary.grandTotal)}</dd></div><div><dt>Paid</dt><dd>{paymentSummary.currencyCode} {formatMoneyDisplay(paymentSummary.totalPaid)}</dd></div><div><dt>Balance Due</dt><dd>{paymentSummary.currencyCode} {formatMoneyDisplay(paymentSummary.balanceDue)}</dd></div>
         {paymentSummary.overpaidAmount !== "0" && <div><dt>Overpaid</dt><dd>{paymentSummary.currencyCode} {formatMoneyDisplay(paymentSummary.overpaidAmount)}</dd></div>}</dl>
       <div className="issued-payment-actions"><Link className="entry-button entry-button-light" href={`${basePath}/payments`}>View Payments</Link>
-        {paymentSummary.lifecycleStatus === "ISSUED" && hasPermission(workspace.role, "PAYMENT_RECORD") && <Link className="entry-button entry-button-light" href={`${basePath}/payments#record-payment`}>Record Payment</Link>}</div>
+        {paymentSummary.lifecycleStatus === "ISSUED" && hasPermission(workspace.role, "PAYMENT_RECORD") && <Link className="entry-button entry-button-accent" href={`${basePath}/payments#record-payment`}>Record Payment</Link>}</div>
       {paymentSummary.paymentStatus === "PAID" && hasPermission(workspace.role, "PAYMENT_RECORD") && <p>Additional payments are accepted and may create an overpayment.</p>}
     </section> : !paymentSummaryAvailable && <section className="issued-payment-summary" role="status"><strong>Payment summary is temporarily unavailable.</strong></section>)}
     <InvoicePreviewScale>{invoiceDocument}</InvoicePreviewScale>

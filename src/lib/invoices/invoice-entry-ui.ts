@@ -99,6 +99,30 @@ export function itemHasMeaningfulContent(item: InvoiceEntryItemState): boolean {
     (item.billingMode === "FLAT_FEE" ? item.amount.trim() : item.unitPrice.trim()));
 }
 
+/** Gate the first production autosave without creating database rows for partial form fragments. */
+export function hasMeaningfulDraftAutosaveThreshold(
+  hasActiveClient: boolean,
+  currencyCode: string,
+  items: readonly InvoiceEntryItemState[],
+): boolean {
+  if (!hasActiveClient || !/^[A-Za-z]{3}$/.test(currencyCode)) return false;
+  return items.some((item) => {
+    if (!item.description.trim()) return false;
+    if (item.billingMode === "FLAT_FEE") return isNonnegativeDecimal(item.amount);
+    return isPositiveDecimal(item.quantity) && isNonnegativeDecimal(item.unitPrice);
+  });
+}
+
+function isNonnegativeDecimal(value: string): boolean {
+  return /^\d+(?:\.\d{1,4})?$/.test(value);
+}
+
+function isPositiveDecimal(value: string): boolean {
+  if (!isNonnegativeDecimal(value)) return false;
+  const [whole = "0", fraction = ""] = value.split(".");
+  return BigInt(whole) * BigInt(10_000) + BigInt((fraction + "0000").slice(0, 4)) > BigInt(0);
+}
+
 const CANONICAL_MONEY_PATTERN = /^\d+(?:\.\d{1,4})?$/;
 const GROUPED_MONEY_PATTERN = /^\d{1,3}(?:,\d{3})+(?:\.\d{1,4})?$/;
 

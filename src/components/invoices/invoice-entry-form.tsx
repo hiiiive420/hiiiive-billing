@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { IssueInvoiceControl } from "./issue-invoice-control";
 import { InvoiceIntentQuickEntry } from "./invoice-intent-quick-entry";
 import {
@@ -10,6 +11,7 @@ import {
   currencyChangeWarningVisible,
   formatMoneyDisplay,
   itemHasMeaningfulContent,
+  hasMeaningfulDraftAutosaveThreshold,
   entryItemToPreviewItem,
   mapDraftInvoiceToEntryInitialState,
   switchInvoiceItemBillingMode,
@@ -22,6 +24,7 @@ import {
   type InvoiceEntryServiceDisplay,
 } from "@/lib/invoices/invoice-entry-ui";
 import { mapInvoiceIntentSuggestionToForm } from "@/lib/invoices/invoice-intent-form";
+import { runSingleFlight } from "@/lib/invoices/autosave-single-flight";
 import type { InvoiceIntentSuggestion } from "@/lib/ai/invoice-intent-contract";
 
 type Client = { id: string; name: string; billingAddress: string | null; email: string | null; phone: string | null; active?: boolean };
@@ -34,7 +37,7 @@ export type InvoiceEntryFormActions = {
   searchServices: (query: string) => Promise<SearchActionResult<Service>>;
   saveDraft?: (value: unknown) => Promise<ActionResult<{ invoiceId: string }>>;
   saveDraftChanges?: (invoiceId: string, value: unknown) => Promise<ActionResult>;
-  issueInvoice?: () => Promise<{ ok: true; invoiceId: string; invoiceNumber: string } | { ok: false; error: string }>;
+  issueInvoice?: (invoiceId?: string) => Promise<{ ok: true; invoiceId: string; invoiceNumber: string } | { ok: false; error: string }>;
   generateIntent?: (text: string) => Promise<import("@/lib/ai/invoice-intent-contract").InvoiceIntentActionResult>;
 };
 export type InvoiceEntryPresentation = {
@@ -75,13 +78,86 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
   const [notes, setNotes] = useState(draftState?.notes ?? "");
   const [formError, setFormError] = useState("");
   const [savedInvoiceId, setSavedInvoiceId] = useState("");
-  const [editSaved, setEditSaved] = useState(false);
   const [formDirty, setFormDirty] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [saveState, setSaveState] = useState<"NOT_SAVED" | "SAVING" | "SAVED" | "FAILED">(editing ? "SAVED" : "NOT_SAVED");
+  const router = useRouter();
+  const revisionRef = useRef(0);
+  const savingRef = useRef<Promise<boolean> | null>(null);
+  const latestPayloadRef = useRef<InvoiceDraftFormPayload | null>(null);
+  const latestRevisionRef = useRef(0);
+  const invoiceIdRef = useRef(invoiceId ?? "");
   const searchClients = actions.searchClients;
   const searchServices = actions.searchServices;
-  const lockCreatedDraft = Boolean(savedInvoiceId) && !editing;
+  const lockCreatedDraft = presentation.mode === "development" && Boolean(savedInvoiceId) && !editing;
   const preview = useMemo(() => calculateInvoicePreview(items.map(entryItemToPreviewItem), discountAmount), [items, discountAmount]);
+
+  const buildPayload = (): InvoiceDraftFormPayload | null => selectedClient ? ({
+    clientId: selectedClient.id, projectTitle, invoiceDate, dueDate, currencyCode: currency,
+    discountLabel, discountAmount, notes, paymentTerms,
+    items: items.map((item) => item.billingMode === "FLAT_FEE"
+      ? { billingMode: "FLAT_FEE" as const, serviceId: item.serviceId, description: item.description, amount: item.amount, useServiceDefaultPrice: item.useServiceDefaultPrice }
+      : { billingMode: "QUANTITY" as const, serviceId: item.serviceId, description: item.description, quantity: item.quantity, unitPrice: item.unitPrice, useServiceDefaultPrice: item.useServiceDefaultPrice }),
+  }) : null;
+  latestPayloadRef.current = buildPayload();
+  latestRevisionRef.current = revisionRef.current;
+
+  function markFormDirty() { revisionRef.current += 1; setFormDirty(true); }
+
+  function saveLatest(): Promise<boolean> {
+    return runSingleFlight(savingRef, async () => {
+      while (true) {
+        const payload = latestPayloadRef.current;
+        const revision = latestRevisionRef.current;
+        if (!payload) { setSaveState("FAILED"); setFormError("Choose a client before saving the draft."); return false; }
+        setSaveState("SAVING");
+        let result: ActionResult<{ invoiceId?: string }>;
+        const id = invoiceIdRef.current || savedInvoiceId;
+        try {
+          if (id) {
+            if (!actions.saveDraftChanges) { setFormError("Draft editing is unavailable."); setSaveState("FAILED"); return false; }
+            result = await actions.saveDraftChanges(id, payload);
+          } else {
+            if (!actions.saveDraft) { setFormError("Draft creation is unavailable."); setSaveState("FAILED"); return false; }
+            result = await actions.saveDraft(payload);
+          }
+        } catch {
+          setFormError("Could not save this draft. Your changes are still here; retry with Save now."); setSaveState("FAILED"); return false;
+        }
+        if (!result.ok) { setFormError(result.error); setSaveState("FAILED"); return false; }
+        setFormError("");
+        if (!id) {
+          if (!result.invoiceId) { setFormError("Draft was saved without an identifier. Retry from the invoice workspace."); setSaveState("FAILED"); return false; }
+          invoiceIdRef.current = result.invoiceId;
+          setSavedInvoiceId(result.invoiceId);
+          const route = `${presentation.editBasePath}/${encodeURIComponent(result.invoiceId)}/edit`;
+          if (presentation.mode === "production") window.history.replaceState(null, "", route);
+        }
+        if (latestRevisionRef.current !== revision) continue;
+        setFormDirty(false); setSaveState("SAVED");
+        return true;
+      }
+    });
+  }
+
+  function meaningfulAutosaveThreshold(): boolean {
+    return hasMeaningfulDraftAutosaveThreshold(Boolean(selectedClient?.active !== false && selectedClient), currency, items);
+  }
+
+  useEffect(() => {
+    if (presentation.mode !== "production" || !formDirty) return;
+    if (!invoiceIdRef.current && !meaningfulAutosaveThreshold()) { setSaveState("NOT_SAVED"); return; }
+    const timer = setTimeout(() => { void saveLatest(); }, 950);
+    return () => clearTimeout(timer);
+    // Save state uses the latest payload/revision refs; form values are explicit dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presentation.mode, formDirty, clientQuery, selectedClient, projectTitle, invoiceDate, dueDate, currency, paymentTerms, items, discountLabel, discountAmount, notes]);
+
+  useEffect(() => {
+    if (presentation.mode !== "production" || !(invoiceIdRef.current || savedInvoiceId) || !(formDirty || saveState === "FAILED" || saveState === "SAVING")) return;
+    const warnBeforeLeave = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warnBeforeLeave);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeave);
+  }, [presentation.mode, savedInvoiceId, formDirty, saveState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,41 +172,15 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
   }, [searchClients, clientQuery]);
 
   function updateItem(key: string, patch: Partial<Item>) {
-    setFormDirty(true);
+    markFormDirty();
     setItems((current) => current.map((item) => item.key === key ? { ...item, ...patch } : item));
-  }
-
-  function save() {
-    setFormError("");
-    setEditSaved(false);
-    if (!selectedClient) { setFormError("Choose a client before saving the draft."); return; }
-    const payload: InvoiceDraftFormPayload = {
-      clientId: selectedClient.id, projectTitle, invoiceDate, dueDate, currencyCode: currency,
-      discountLabel, discountAmount, notes, paymentTerms,
-      items: items.map((item) => item.billingMode === "FLAT_FEE"
-        ? { billingMode: "FLAT_FEE" as const, serviceId: item.serviceId, description: item.description, amount: item.amount, useServiceDefaultPrice: item.useServiceDefaultPrice }
-        : { billingMode: "QUANTITY" as const, serviceId: item.serviceId, description: item.description, quantity: item.quantity, unitPrice: item.unitPrice, useServiceDefaultPrice: item.useServiceDefaultPrice }),
-    };
-    startTransition(async () => {
-      if (editing && invoiceId) {
-        if (!actions.saveDraftChanges) { setFormError("Draft editing is unavailable."); return; }
-        const result = await actions.saveDraftChanges(invoiceId, payload);
-        if (result.ok) { setEditSaved(true); setFormDirty(false); }
-        else setFormError(result.error);
-      } else {
-        if (!actions.saveDraft) { setFormError("Draft creation is unavailable."); return; }
-        const result = await actions.saveDraft(payload);
-        if (result.ok) setSavedInvoiceId(result.invoiceId);
-        else setFormError(result.error);
-      }
-    });
   }
 
   function startAnotherDraft() {
     setSelectedClient(null); setClientQuery(""); setProjectTitle(""); setInvoiceDate(""); setDueDate("");
     setCurrency("LKR"); setOriginalCurrency("LKR"); setCurrencyChanged(false); setPaymentTerms("");
     setItems([initialItem()]); nextItemKey.current = 1; setDiscountLabel(""); setDiscountAmount("0"); setNotes("");
-    setSavedInvoiceId(""); setFormError("");
+    setSavedInvoiceId(""); invoiceIdRef.current = ""; revisionRef.current = 0; setSaveState("NOT_SAVED"); setFormDirty(false); setFormError("");
   }
 
   function applyInvoiceIntent(suggestion: InvoiceIntentSuggestion) {
@@ -151,9 +201,8 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
     setDiscountLabel(patch.discountLabel);
     setDiscountAmount(patch.discountAmount);
     setNotes(patch.notes);
-    setFormDirty(true);
+    markFormDirty();
     setFormError("");
-    setEditSaved(false);
   }
 
   const hasExistingFormData = Boolean(
@@ -161,22 +210,37 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
     currency !== "LKR" || paymentTerms.trim() || notes.trim() || discountLabel.trim() || discountAmount !== "0" ||
     items.some((item) => itemHasMeaningfulContent(item) || item.quantity !== "1"),
   );
+  const persistedInvoiceId = invoiceIdRef.current || savedInvoiceId || invoiceId || "";
+  const canIssue = Boolean(persistedInvoiceId && actions.issueInvoice && saveState === "SAVED" && !formDirty);
+  async function openPreview() {
+    if (!persistedInvoiceId && !meaningfulAutosaveThreshold()) return;
+    if (formDirty || saveState !== "SAVED") {
+      if (!await saveLatest()) return;
+    }
+    const id = invoiceIdRef.current || savedInvoiceId || invoiceId;
+    if (id) router.push(`${presentation.editBasePath}/${encodeURIComponent(id)}/preview`);
+  }
+  function guardNavigation(event: React.MouseEvent<HTMLElement>) {
+    if (presentation.mode !== "production" || !(invoiceIdRef.current || savedInvoiceId) || !(formDirty || saveState === "FAILED" || saveState === "SAVING")) return;
+    const target = event.target;
+    if (!(target instanceof Element) || !target.closest("a[href]")) return;
+    if (!window.confirm("This draft has changes that are not saved yet. Leave this page?")) event.preventDefault();
+  }
 
   return (
-    <main className={`entry-page${presentation.mode === "production" ? " entry-page-production" : ""}`} onChange={() => setFormDirty(true)}>
+    <main className={`entry-page${presentation.mode === "production" ? " entry-page-production" : ""}`} onChange={markFormDirty} onClickCapture={guardNavigation}>
       {presentation.mode === "development" ? <div className="entry-dev-banner"><span className="entry-dev-dot" /> Development Invoice Entry <span>Development data only</span></div> : workspaceHeader}
       <header className="entry-header">
         <div><div className="entry-eyebrow"><Link href={presentation.editBasePath}>INVOICES</Link> <span>/</span> {editing ? "EDIT DRAFT" : "NEW"}</div><div className="entry-title-row"><h1>{editing ? "Edit Invoice" : "Create Invoice"}</h1><span className="entry-status"><i /> Draft</span></div></div>
         <div className="entry-actions">
-          {editing && presentation.previewHref && !formDirty ? <Link className="entry-button entry-button-light" href={presentation.previewHref}>Preview</Link> : <button className="entry-button entry-button-light" type="button" disabled title={formDirty ? "Save changes before previewing" : "Save the draft and open it in edit mode to preview"}>Preview</button>}
-          {editing && actions.issueInvoice ? <IssueInvoiceControl issue={actions.issueInvoice} invoiceBasePath={presentation.editBasePath} disabled={formDirty} /> : <button className="entry-button entry-button-disabled" type="button" disabled title="Save the draft and open it in edit mode before issuing">Issue Invoice</button>}
-          {editing && formDirty && <span className="entry-hint">Save changes before previewing or issuing.</span>}
-          <button className="entry-button entry-button-primary" type="button" onClick={save} disabled={isPending || lockCreatedDraft}>{isPending ? "Saving…" : editing ? "Save Changes" : savedInvoiceId ? "Draft Saved" : "Save Draft"}</button>
+          {presentation.mode === "production" && <span className="entry-save-status" role="status">{saveState === "NOT_SAVED" ? "Not saved yet" : saveState === "SAVING" ? "Saving…" : saveState === "FAILED" ? "Save failed" : "Saved"}</span>}
+          {presentation.mode === "production" && (persistedInvoiceId || meaningfulAutosaveThreshold()) ? <button className="entry-button entry-button-light" type="button" onClick={() => void openPreview()}>Preview</button> : <button className="entry-button entry-button-light" type="button" disabled title="Save the draft in the production workspace before previewing">Preview</button>}
+          {actions.issueInvoice && persistedInvoiceId ? <IssueInvoiceControl issue={actions.issueInvoice} invoiceBasePath={presentation.editBasePath} invoiceId={persistedInvoiceId} beforeIssue={saveLatest} disabled={!canIssue} /> : <button className="entry-button entry-button-disabled" type="button" disabled title="A saved draft that meets issue requirements is required">Issue Invoice</button>}
+          <button className="entry-button entry-button-light" type="button" onClick={() => { setFormError(""); void saveLatest(); }} disabled={saveState === "SAVING" || (!editing && !savedInvoiceId && !meaningfulAutosaveThreshold())}>Save now</button>
         </div>
       </header>
 
-      {savedInvoiceId && <div className="entry-success" role="status"><strong>Draft saved.</strong>{presentation.mode === "development" && <> Draft ID: <code>{savedInvoiceId}</code></>}<a href={`${presentation.editBasePath}/${savedInvoiceId}/edit`}>Continue editing draft</a>{presentation.mode === "development" && <button type="button" onClick={startAnotherDraft}>Create another draft</button>}</div>}
-      {editSaved && <div className="entry-success" role="status"><strong>Draft changes saved.</strong> Continue editing and save again when ready.</div>}
+      {presentation.mode === "development" && savedInvoiceId && <div className="entry-success" role="status"><strong>Draft saved.</strong> Draft ID: <code>{savedInvoiceId}</code><button type="button" onClick={startAnotherDraft}>Create another draft</button></div>}
       {formError && <div className="entry-error" role="alert">{formError}</div>}
 
       {presentation.mode === "production" && !editing && !savedInvoiceId && actions.generateIntent && <InvoiceIntentQuickEntry
@@ -190,11 +254,11 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
           <section className="entry-card" aria-labelledby="client-heading">
             <div className="entry-section-heading"><span className="entry-step">01</span><div><h2 id="client-heading">Client</h2><p>Choose who this invoice is for.</p></div></div>
             <div className="entry-field entry-client-search"><label htmlFor="client-search">Search clients</label><input id="client-search" autoComplete="off" placeholder="Search by name, email, or phone" value={clientQuery} onChange={(event) => { setClientQuery(event.target.value); setSelectedClient(null); }} disabled={lockCreatedDraft} />
-              {!selectedClient && clientQuery && clients.length > 0 && <div className="entry-search-results" role="listbox" aria-label="Client search results">{clients.map((client) => <button type="button" role="option" aria-selected="false" key={client.id} onClick={() => { setFormDirty(true); setSelectedClient(client); setClientQuery(client.name); }}>{client.name}<small>{client.email ?? client.phone ?? "Client"}</small></button>)}</div>}
+              {!selectedClient && clientQuery && clients.length > 0 && <div className="entry-search-results" role="listbox" aria-label="Client search results">{clients.map((client) => <button type="button" role="option" aria-selected="false" key={client.id} onClick={() => { markFormDirty(); setSelectedClient(client); setClientQuery(client.name); }}>{client.name}<small>{client.email ?? client.phone ?? "Client"}</small></button>)}</div>}
               {clientError && <p className="entry-inline-error" role="alert">{clientError}</p>}
               {!selectedClient && !clientError && <p className="entry-hint">Type to search active clients in {presentation.mode === "development" ? "the development organization" : presentation.organizationName}.</p>}
             </div>
-            {selectedClient && <div className="entry-client-summary"><div className="entry-client-avatar">{selectedClient.name.slice(0, 1).toUpperCase()}</div><div><strong>{selectedClient.name}</strong><div>{selectedClient.billingAddress || "No billing address on file"}</div><div>{selectedClient.email || "No email"} <span>·</span> {selectedClient.phone || "No phone"}</div>{selectedClient.active === false && <small className="entry-inline-error">This client is inactive. Choose an active client before saving.</small>}</div><button type="button" className="entry-text-button" onClick={() => { setFormDirty(true); setSelectedClient(null); setClientQuery(""); }} disabled={lockCreatedDraft}>Change</button></div>}
+            {selectedClient && <div className="entry-client-summary"><div className="entry-client-avatar">{selectedClient.name.slice(0, 1).toUpperCase()}</div><div><strong>{selectedClient.name}</strong><div>{selectedClient.billingAddress || "No billing address on file"}</div><div>{selectedClient.email || "No email"} <span>·</span> {selectedClient.phone || "No phone"}</div>{selectedClient.active === false && <small className="entry-inline-error">This client is inactive. Choose an active client before saving.</small>}</div><button type="button" className="entry-text-button" onClick={() => { markFormDirty(); setSelectedClient(null); setClientQuery(""); }} disabled={lockCreatedDraft}>Change</button></div>}
           </section>
 
           <section className="entry-card" aria-labelledby="details-heading">
@@ -210,9 +274,9 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
           </section>
 
           <section className="entry-card entry-items-card" aria-labelledby="items-heading">
-            <div className="entry-section-heading entry-items-heading"><span className="entry-step">03</span><div><h2 id="items-heading">Items</h2><p>Add a service or enter a custom line item.</p></div><button className="entry-button entry-button-light" type="button" onClick={() => { setFormDirty(true); setItems((current) => [...current, initialItem(`item-${nextItemKey.current++}`)]); }} disabled={lockCreatedDraft}>＋ Add item</button></div>
+            <div className="entry-section-heading entry-items-heading"><span className="entry-step">03</span><div><h2 id="items-heading">Items</h2><p>Add a service or enter a custom line item.</p></div><button className="entry-button entry-button-light" type="button" onClick={() => { markFormDirty(); setItems((current) => [...current, initialItem(`item-${nextItemKey.current++}`)]); }} disabled={lockCreatedDraft}>＋ Add item</button></div>
             <div className="entry-item-list">
-              {items.map((item, index) => <InvoiceItemRow key={item.key} item={item} index={index} count={items.length} currency={currency} disabled={lockCreatedDraft} searchServices={searchServices} onChange={(patch) => updateItem(item.key, patch)} onRemove={() => { setFormDirty(true); setItems((current) => current.filter((candidate) => candidate.key !== item.key)); }} onMove={(direction) => { setFormDirty(true); setItems((current) => { const next = [...current]; const target = index + direction; if (target < 0 || target >= next.length) return current; [next[index]!, next[target]!] = [next[target]!, next[index]!]; return next; }); }} amount={preview.amountFor(entryItemToPreviewItem(item))} />)}
+              {items.map((item, index) => <InvoiceItemRow key={item.key} item={item} index={index} count={items.length} currency={currency} disabled={lockCreatedDraft} searchServices={searchServices} onChange={(patch) => updateItem(item.key, patch)} onRemove={() => { markFormDirty(); setItems((current) => current.filter((candidate) => candidate.key !== item.key)); }} onMove={(direction) => { markFormDirty(); setItems((current) => { const next = [...current]; const target = index + direction; if (target < 0 || target >= next.length) return current; [next[index]!, next[target]!] = [next[target]!, next[index]!]; return next; }); }} amount={preview.amountFor(entryItemToPreviewItem(item))} />)}
             </div>
             {items.length === 0 && <p className="entry-empty-items">No items yet. Add an item to begin.</p>}
           </section>
@@ -232,7 +296,7 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
           <div className="entry-total-line"><span>Discount</span><strong>− {currency} {formatMoneyDisplay(preview.discount)}</strong></div>
           <div className="entry-total-payable"><span>Amount payable</span><strong>{currency} {formatMoneyDisplay(preview.payable)}</strong></div>
           <p className="entry-preview-note">Preview only. Final totals are calculated and validated when saved.</p>
-          <button className="entry-button entry-button-primary entry-summary-save" type="button" onClick={save} disabled={isPending || lockCreatedDraft}>{isPending ? "Saving…" : editing ? "Save Changes" : savedInvoiceId ? "Draft Saved" : "Save Draft"}</button>
+          <button className="entry-button entry-button-light entry-summary-save" type="button" onClick={() => void saveLatest()} disabled={saveState === "SAVING"}>Save now</button>
         </aside>
       </div>
       <footer className="entry-footer">{presentation.mode === "development" && <span>Development entry only</span>}<span>Invoice totals are confirmed by the server on save.</span></footer>
