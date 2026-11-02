@@ -4,6 +4,7 @@ import { hasPermission, requireOrganizationBySlug, AuthorizationError, Organizat
 import { loadServiceWorkspace } from "@/lib/master-data/workspaces";
 import { MasterDataAccessMessage, MasterDataShell } from "@/components/master-data/workspace-shell";
 import { formatMoneyDisplay } from "@/lib/invoices/invoice-entry-ui";
+import { StatusChip } from "@/components/status-chip";
 export const dynamic = "force-dynamic";
 type Params = Readonly<Record<string, string | string[] | undefined>>;
 
@@ -30,5 +31,5 @@ export default async function ServicesPage({ params, searchParams }: { params: P
     </section>
   </MasterDataShell>;
 }
-function Status({ active }: { active: boolean }) { return <span className={`master-data-status ${active ? "is-active" : "is-inactive"}`}>{active ? "Active" : "Inactive"}</span>; }
+function Status({ active }: { active: boolean }) { return <StatusChip status={active ? "ACTIVE" : "INACTIVE"} />; }
 function date(value: Date) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Colombo" }).format(value); }

@@ -6,6 +6,8 @@ import { AuthenticationError } from "@/lib/auth/identity";
 import { InvoicePaymentReadModelError, loadInvoicePaymentSummary } from "@/lib/invoices/invoice-payments";
 import { formatMoneyDisplay } from "@/lib/invoices/invoice-entry-ui";
 import { recordOrganizationInvoicePaymentAction } from "./actions";
+import { WorkspaceHeader } from "@/components/master-data/workspace-shell";
+import { StatusChip } from "@/components/status-chip";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +31,7 @@ export default async function InvoicePaymentsPage({ params }: { params: Promise<
   const action = recordOrganizationInvoicePaymentAction.bind(null, workspace.organizationSlug, invoiceId);
   const defaultDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   return <main className="entry-page entry-page-production invoice-payments-page">
-    <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><span>{workspace.organizationName}</span><span className="entry-workspace-user">{workspace.userLabel} · {workspace.role}</span></div>
+    <WorkspaceHeader workspace={workspace} current="invoices" />
     <nav className="invoice-payment-breadcrumbs" aria-label="Invoice navigation"><Link href={invoiceHref}>← Back to Invoice</Link><Link href={basePath}>Back to Invoices</Link></nav>
     <header className="entry-header invoice-payment-header"><div><div className="entry-eyebrow">PAYMENTS</div><div className="entry-title-row"><h1>{summary.invoiceNumber ?? "Invoice"}</h1><StatusChip status={summary.lifecycleStatus} /></div><p className="invoice-payment-client">Client: {summary.clientName}</p></div></header>
     <section className="invoice-payment-summary" aria-label="Payment summary">
@@ -59,10 +61,6 @@ function money(currency: string, value: string) { return `${currency} ${formatMo
 function formatDate(value: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "Asia/Colombo" }).format(new Date(value)); }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Colombo" }).format(new Date(value)); }
 function methodLabel(value: string) { return ({ BANK_TRANSFER: "Bank transfer", CASH: "Cash", CHEQUE: "Cheque", CARD: "Card", OTHER: "Other" } as Record<string, string>)[value] ?? value; }
-function StatusChip({ status }: { status: string }) {
-  const labels: Record<string, string> = { ISSUED: "Issued", DRAFT: "Draft", SUPERSEDED: "Superseded", VOID: "Void", WRITTEN_OFF: "Written Off", UNPAID: "Unpaid", PARTIALLY_PAID: "Partially Paid", PAID: "Paid" };
-  return <span className={`invoice-status-chip invoice-status-${status.toLowerCase()}`}>{labels[status] ?? status}</span>;
-}
 function AccessMessage({ error }: { error: unknown }) {
   const message = process.env.NODE_ENV !== "production" && (error instanceof AuthenticationError || error instanceof ProvisioningError)
     ? error.message

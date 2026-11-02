@@ -23,6 +23,16 @@ body {
   font: 14px/1.4 Arial, sans-serif;
   box-shadow: 0 2px 8px rgb(20 38 50 / 10%);
 }
+.invoice-document-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-left-color: #347467; color: #425459; }
+.invoice-document-context { min-width: 0; }
+.invoice-document-context nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #849194; font-size: 11px; }
+.invoice-document-context nav a { color: #347467; font-weight: 600; text-decoration: none; }
+.invoice-document-context nav a:hover { text-decoration: underline; }
+.invoice-document-title { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 6px; }
+.invoice-document-title h1 { margin: 0; color: #25343a; font-size: 18px; line-height: 1.25; }
+.invoice-document-context p { margin: 5px 0 0; color: #657477; font-size: 12px; }
+.invoice-document-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.invoice-document-actions .entry-button { min-height: 38px; white-space: nowrap; }
 .invoice-workspace-breadcrumb { display: inline-flex; align-items: center; min-height: 30px; margin-right: 6px; padding-inline: 9px; color: #245b52; font-weight: 600; text-decoration: none; vertical-align: middle; }
 .invoice-workspace-breadcrumb:hover { color: #1b4d45; }
 .invoice-workspace-breadcrumb:focus-visible { outline: 3px solid #55968666; outline-offset: 3px; }
@@ -167,7 +177,7 @@ body {
   html, body { width: 210mm; min-height: 297mm; margin: 0 !important; background: #fff !important; }
   body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .preview-shell { min-height: 0; padding: 0; background: #fff; }
-  .preview-banner { display: none !important; }
+  .preview-banner, .app-workspace-chrome, .invoice-document-toolbar { display: none !important; }
   .invoice-preview-frame { height: 297mm !important; overflow: visible; }
   .invoice-preview-scale { transform: none !important; }
   .invoice-sheet {
@@ -179,4 +189,9 @@ body {
     break-after: avoid;
     page-break-after: avoid;
   }
+}
+
+@media screen and (max-width: 700px) {
+  .invoice-document-toolbar { align-items: stretch; flex-direction: column; }
+  .invoice-document-actions { justify-content: flex-start; }
 }

@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
+import { StatusChip } from "@/components/status-chip";
 
 type EmailAction = (input: unknown) => Promise<{ ok: true; attemptId: string } | { ok: false; error: string }>;
 
 export function InvoiceEmailForm({
   invoiceNumber, fromDisplay, senderConfigured, attachmentFilename, initialTo, subject: initialSubject,
-  bodyText: initialBody, recentAttempts, workspaceHref, invoiceHref, sendAction,
+  bodyText: initialBody, recentAttempts, workspaceHref, invoiceHref, sendAction, workspaceHeader,
 }: {
   invoiceNumber: string;
   fromDisplay: string;
@@ -20,6 +21,7 @@ export function InvoiceEmailForm({
   workspaceHref: string;
   invoiceHref: string;
   sendAction: EmailAction;
+  workspaceHeader: ReactNode;
 }) {
   const [to, setTo] = useState(initialTo);
   const [cc, setCc] = useState("");
@@ -42,9 +44,9 @@ export function InvoiceEmailForm({
   }
 
   return <main className="entry-page entry-page-production email-page">
-    <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><Link href={workspaceHref}>Invoices</Link><span>Invoice {invoiceNumber}</span></div>
+    {workspaceHeader}
     <header className="entry-header">
-      <div><div className="entry-eyebrow">INVOICES <span>/</span> EMAIL</div><div className="entry-title-row"><h1>Send Invoice {invoiceNumber}</h1></div></div>
+      <div><div className="entry-eyebrow"><Link href={workspaceHref}>INVOICES</Link> <span>/</span> {invoiceNumber} <span>/</span> EMAIL</div><div className="entry-title-row"><h1>Send invoice</h1></div></div>
       <Link className="entry-button entry-button-light" href={invoiceHref}>Back to Invoice</Link>
     </header>
     {error && <div className="entry-error" role="alert">{error}</div>}
@@ -67,7 +69,7 @@ export function InvoiceEmailForm({
       <aside className="entry-card email-history" aria-labelledby="email-history-title">
         <div className="entry-section-heading"><div><h2 id="email-history-title">Recent attempts</h2><p>Latest 5 email attempts. BCC recipients are hidden.</p></div></div>
         {recentAttempts.length === 0 ? <p className="entry-hint">No send attempts yet.</p> : <ol>{recentAttempts.map((attempt) => <li key={attempt.id}>
-          <div><strong className={`email-history-status email-history-${attempt.status.toLowerCase()}`}>{attempt.status === "PARTIALLY_SENT" ? "Partially sent" : attempt.status}</strong><time dateTime={attempt.timestamp}>{formatUtcTimestamp(attempt.timestamp)}</time></div>
+          <div><StatusChip status={attempt.status} /><time dateTime={attempt.timestamp}>{formatUtcTimestamp(attempt.timestamp)}</time></div>
           <span>To: {attempt.toRecipients.join(", ")}</span><span>CC recipients: {attempt.ccCount}</span>
         </li>)}</ol>}
       </aside>

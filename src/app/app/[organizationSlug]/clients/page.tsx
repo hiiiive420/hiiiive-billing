@@ -4,6 +4,7 @@ import { hasPermission, requireOrganizationBySlug, AuthorizationError, Organizat
 import { AuthenticationError } from "@/lib/auth/identity";
 import { loadClientWorkspace } from "@/lib/master-data/workspaces";
 import { MasterDataAccessMessage, MasterDataShell } from "@/components/master-data/workspace-shell";
+import { StatusChip } from "@/components/status-chip";
 
 export const dynamic = "force-dynamic";
 type Params = Readonly<Record<string, string | string[] | undefined>>;
@@ -32,7 +33,7 @@ export default async function ClientsPage({ params, searchParams }: { params: Pr
   </MasterDataShell>;
 }
 
-function Status({ active }: { active: boolean }) { return <span className={`master-data-status ${active ? "is-active" : "is-inactive"}`}>{active ? "Active" : "Inactive"}</span>; }
+function Status({ active }: { active: boolean }) { return <StatusChip status={active ? "ACTIVE" : "INACTIVE"} />; }
 function date(value: Date) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Colombo" }).format(value); }
 function Pagination({ page, totalPages, previous, next }: { page: number; totalPages: number; previous?: string; next?: string }) { return <nav className="invoice-workspace-pagination" aria-label="Client pages">{previous ? <Link className="entry-button entry-button-light" href={previous}>Previous</Link> : <span className="entry-button entry-button-light is-disabled">Previous</span>}<span>Page {page} of {totalPages}</span>{next ? <Link className="entry-button entry-button-light" href={next}>Next</Link> : <span className="entry-button entry-button-light is-disabled">Next</span>}</nav>; }
 function accessMessage(error: unknown) { return process.env.NODE_ENV !== "production" && (error instanceof AuthenticationError || error instanceof ProvisioningError) ? error.message : error instanceof AuthorizationError ? "You do not have permission to view clients in this organization." : "We couldn't verify access to this workspace."; }

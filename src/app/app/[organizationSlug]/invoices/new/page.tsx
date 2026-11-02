@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { InvoiceEntryForm } from "@/components/invoices/invoice-entry-form";
+import { WorkspaceHeader } from "@/components/master-data/workspace-shell";
 import { requireOrganizationBySlug, OrganizationContextNotFoundError, AuthorizationError, ProvisioningError } from "@/lib/auth/authorization";
 import { AuthenticationError } from "@/lib/auth/identity";
 import { createOrganizationDraftAction, generateInvoiceIntentAction, searchCreateClientsAction, searchCreateServicesAction } from "../actions";
@@ -20,6 +21,7 @@ export default async function NewOrganizationInvoicePage({ params }: { params: P
 
   return <InvoiceEntryForm
     actions={{ searchClients, searchServices, saveDraft, generateIntent }}
+    workspaceHeader={<WorkspaceHeader workspace={workspace} current="invoices" />}
     presentation={{
       mode: "production",
       organizationName: workspace.organizationName,

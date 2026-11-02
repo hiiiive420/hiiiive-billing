@@ -3,7 +3,7 @@ import { AuthorizationError, OrganizationContextNotFoundError, requireOrganizati
 import { resolveInvoiceRenderer } from "@/lib/invoice-templates/registry";
 import type { InvoiceView } from "@/lib/invoice-templates/config";
 import { loadSettingsWorkspace } from "@/lib/settings/workspace";
-import { MasterDataLinks } from "@/components/master-data/workspace-shell";
+import { WorkspaceHeader } from "@/components/master-data/workspace-shell";
 import { InvoicePreviewScale } from "@/app/dev/invoice-preview/invoice-preview-scale";
 import { InvoiceSettingsForm, OrganizationSettingsForm } from "./settings-forms";
 
@@ -27,8 +27,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ organ
   const settings = await loadSettingsWorkspace(workspace.organizationId);
   const base = `/app/${encodeURIComponent(workspace.organizationSlug)}`;
   return <main className="entry-page entry-page-production master-data-page settings-page">
-    <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><span>{workspace.organizationName}</span><span className="entry-workspace-user">{workspace.userLabel} · {workspace.role}</span></div>
-    <MasterDataLinks workspace={workspace} current="settings" />
+    <WorkspaceHeader workspace={workspace} current="settings" />
     <header className="entry-header"><div><div className="entry-eyebrow">WORKSPACE</div><div className="entry-title-row"><h1>Settings</h1></div></div></header>
     <OrganizationSettingsForm slug={workspace.organizationSlug} name={settings.organization.name} />
     {settings.template ? <>

@@ -146,6 +146,12 @@
 .invoice-status-unpaid { border-color: #eadcbf; color: #896522; background: #fff9ec; }
 .invoice-status-partially_paid { border-color: #cfe0eb; color: #376a82; background: #f1f8fb; }
 .invoice-status-paid { border-color: #cfe5d9; color: #367251; background: #f1faf4; }
+.status-chip { min-height: 23px; padding: 3px 8px; font-size: 10px; line-height: 1.4; }
+.status-chip-draft, .status-chip-unpaid, .status-chip-pending, .status-chip-sending { border-color: #eadcbf; color: #896522; background: #fff9ec; }
+.status-chip-issued, .status-chip-partially-paid, .status-chip-partially-sent { border-color: #cfe0eb; color: #376a82; background: #f1f8fb; }
+.status-chip-paid, .status-chip-active, .status-chip-sent { border-color: #cfe5d9; color: #367251; background: #f1faf4; }
+.status-chip-failed, .status-chip-void, .status-chip-written-off { border-color: #ebd2ce; color: #9b473c; background: #fff5f3; }
+.status-chip-inactive, .status-chip-superseded, .status-chip-never-sent { border-color: #dfe6e4; color: #657477; background: #f5f7f7; }
 .invoice-email-state { color: #718084; font-size: 11px; white-space: nowrap; }
 .invoice-email-pending { color: #896522; }
 .invoice-email-sent { color: #367251; }
@@ -202,7 +208,9 @@
 .email-history-pending { color: #896522; }
 
 @media (max-width: 1060px) {
-  .invoice-workspace-filters { grid-template-columns: minmax(180px, 1.5fr) repeat(2, minmax(125px, 1fr)); }
+  .invoice-workspace-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .invoice-workspace-filters { grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(105px, 1fr)); }
+  .invoice-search-field { grid-column: span 2; }
   .invoice-filter-actions { grid-column: 1 / -1; }
   .invoice-workspace-table-wrap { display: none; }
   .invoice-workspace-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; padding: 14px; }
@@ -228,6 +236,7 @@
   .entry-actions .entry-button { flex: 1; padding-inline: 9px; }
   .entry-layout { grid-template-columns: 1fr; }
   .email-layout { grid-template-columns: 1fr; }
+  .invoice-workspace-cards { grid-template-columns: 1fr; }
   .email-history { position: static; }
   .entry-summary { position: static; }
   .entry-item-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; border: 1px solid #e6eceb; border-radius: 9px; margin: 0 0 12px; padding: 15px; }

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { InvoiceEmailForm } from "@/components/invoices/invoice-email-form";
+import { WorkspaceHeader } from "@/components/master-data/workspace-shell";
 import { AuthorizationError, OrganizationContextNotFoundError, ProvisioningError, requireOrganizationBySlug } from "@/lib/auth/authorization";
 import { AuthenticationError } from "@/lib/auth/identity";
 import { InvoiceEmailError, loadInvoiceEmailComposerData } from "@/lib/invoices/invoice-email";
@@ -37,6 +38,7 @@ export default async function SendInvoicePage({ params }: { params: Promise<{ or
     bodyText={composer.defaults.bodyText}
     recentAttempts={composer.recentAttempts}
     workspaceHref={workspaceHref}
+    workspaceHeader={<WorkspaceHeader workspace={workspace} current="invoices" />}
     invoiceHref={invoiceHref}
     sendAction={sendAction}
   />;

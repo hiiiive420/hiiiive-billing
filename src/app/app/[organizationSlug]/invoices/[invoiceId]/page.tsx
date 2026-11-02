@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createElement } from "react";
 import { notFound } from "next/navigation";
 import { AuthorizationError, hasPermission, OrganizationContextNotFoundError, requireOrganizationBySlug } from "@/lib/auth/authorization";
+import { WorkspaceHeader } from "@/components/master-data/workspace-shell";
+import { StatusChip } from "@/components/status-chip";
 import { loadIssuedInvoiceDocument, IssuedInvoiceDocumentError } from "@/lib/invoices/issued-invoice-document";
 import { resolveInvoiceRenderer } from "@/lib/invoice-templates/registry";
 import { InvoicePreviewScale } from "@/app/dev/invoice-preview/invoice-preview-scale";
@@ -26,7 +28,7 @@ export default async function IssuedInvoicePage({ params }: { params: Promise<{ 
   }
   const invoiceDocument = createElement(resolveInvoiceRenderer(document.rendererKey), { config: document.config, invoice: document.invoice });
   const workspaceHref = `/app/${encodeURIComponent(workspace.organizationSlug)}/invoices`;
-  const basePath = `/app/${encodeURIComponent(workspace.organizationSlug)}/invoices/${encodeURIComponent(invoiceId)}`;
+  const basePath = `${workspaceHref}/${encodeURIComponent(invoiceId)}`;
   let paymentSummary = null;
   let paymentSummaryAvailable = true;
   if (hasPermission(workspace.role, "PAYMENT_READ")) {
@@ -34,11 +36,19 @@ export default async function IssuedInvoicePage({ params }: { params: Promise<{ 
     catch { paymentSummaryAvailable = false; }
   }
   return <main className="preview-shell">
-    <div className="preview-banner"><Link className="entry-button entry-button-light invoice-workspace-breadcrumb" href={workspaceHref}>Invoices</Link> · <strong>{document.invoice.invoiceNumber}</strong> | {document.lifecycleStatus.replaceAll("_", " ")} | {document.paymentStatus.replaceAll("_", " ")}
-      <div className="document-actions"><Link className="entry-button entry-button-light" href={`${basePath}/pdf`} download>Download PDF</Link>{document.lifecycleStatus === "ISSUED" && hasPermission(workspace.role, "INVOICE_SEND") && <Link className="entry-button entry-button-primary" href={`${basePath}/send`}>Send Invoice</Link>}</div>
-    </div>
+    <WorkspaceHeader workspace={workspace} current="invoices" />
+    <header className="preview-banner invoice-document-toolbar">
+      <div className="invoice-document-context">
+        <nav aria-label="Breadcrumb"><Link href={workspaceHref}>Invoices</Link><span aria-hidden="true">/</span><span>{document.invoice.invoiceNumber}</span></nav>
+        <div className="invoice-document-title"><h1>{document.invoice.invoiceNumber}</h1><StatusChip status={document.lifecycleStatus} /><StatusChip status={document.paymentStatus} /></div>
+      </div>
+      <div className="document-actions">
+        <Link className="entry-button entry-button-light" href={`${basePath}/pdf`} download>Download PDF</Link>
+        {document.lifecycleStatus === "ISSUED" && hasPermission(workspace.role, "INVOICE_SEND") && <Link className="entry-button entry-button-primary" href={`${basePath}/send`}>Send Invoice</Link>}
+      </div>
+    </header>
     {hasPermission(workspace.role, "PAYMENT_READ") && (paymentSummary ? <section className="issued-payment-summary" aria-label="Payment summary">
-      <div className="issued-payment-heading"><strong>Payment</strong><span className={`invoice-status-chip invoice-status-${paymentSummary.paymentStatus.toLowerCase()}`}>{paymentSummary.paymentStatus.replaceAll("_", " ")}</span></div>
+      <div className="issued-payment-heading"><strong>Payment summary</strong><StatusChip status={paymentSummary.paymentStatus} /></div>
       <dl><div><dt>Invoice Total</dt><dd>{paymentSummary.currencyCode} {formatMoneyDisplay(paymentSummary.grandTotal)}</dd></div><div><dt>Paid</dt><dd>{paymentSummary.currencyCode} {formatMoneyDisplay(paymentSummary.totalPaid)}</dd></div><div><dt>Balance Due</dt><dd>{paymentSummary.currencyCode} {formatMoneyDisplay(paymentSummary.balanceDue)}</dd></div>
         {paymentSummary.overpaidAmount !== "0" && <div><dt>Overpaid</dt><dd>{paymentSummary.currencyCode} {formatMoneyDisplay(paymentSummary.overpaidAmount)}</dd></div>}</dl>
       <div className="issued-payment-actions"><Link className="entry-button entry-button-light" href={`${basePath}/payments`}>View Payments</Link>

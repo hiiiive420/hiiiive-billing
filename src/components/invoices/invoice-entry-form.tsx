@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { IssueInvoiceControl } from "./issue-invoice-control";
 import { InvoiceIntentQuickEntry } from "./invoice-intent-quick-entry";
@@ -48,11 +48,12 @@ export type InvoiceEntryPresentation = {
 
 const initialItem = (key = "item-0"): Item => ({ key, billingMode: DEFAULT_INVOICE_BILLING_MODE, serviceId: null, serviceQuery: "", selectedService: null, description: "", quantity: "1", unitPrice: "", amount: "", useServiceDefaultPrice: false });
 
-export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentation }: {
+export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentation, workspaceHeader }: {
   invoiceId?: string;
   initialDraft?: InvoiceEntryDraftData;
   actions: InvoiceEntryFormActions;
   presentation: InvoiceEntryPresentation;
+  workspaceHeader?: ReactNode;
 }) {
   const editing = Boolean(invoiceId && initialDraft);
   const draftState = initialDraft ? mapDraftInvoiceToEntryInitialState(initialDraft) : null;
@@ -163,7 +164,7 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
 
   return (
     <main className={`entry-page${presentation.mode === "production" ? " entry-page-production" : ""}`} onChange={() => setFormDirty(true)}>
-      {presentation.mode === "development" ? <div className="entry-dev-banner"><span className="entry-dev-dot" /> Development Invoice Entry <span>Development data only</span></div> : <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><span>{presentation.organizationName}</span>{presentation.userLabel && <span className="entry-workspace-user">{presentation.userLabel}{presentation.role ? ` · ${presentation.role}` : ""}</span>}</div>}
+      {presentation.mode === "development" ? <div className="entry-dev-banner"><span className="entry-dev-dot" /> Development Invoice Entry <span>Development data only</span></div> : workspaceHeader}
       <header className="entry-header">
         <div><div className="entry-eyebrow"><Link href={presentation.editBasePath}>INVOICES</Link> <span>/</span> {editing ? "EDIT DRAFT" : "NEW"}</div><div className="entry-title-row"><h1>{editing ? "Edit Invoice" : "Create Invoice"}</h1><span className="entry-status"><i /> Draft</span></div></div>
         <div className="entry-actions">

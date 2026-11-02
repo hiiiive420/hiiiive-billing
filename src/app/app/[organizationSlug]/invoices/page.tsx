@@ -4,7 +4,8 @@ import { AuthorizationError, hasPermission, OrganizationContextNotFoundError, Pr
 import { AuthenticationError } from "@/lib/auth/identity";
 import { loadInvoiceWorkspace, type InvoiceWorkspaceRow } from "@/lib/invoices/invoice-workspace";
 import { formatMoneyDisplay } from "@/lib/invoices/invoice-entry-ui";
-import { MasterDataLinks } from "@/components/master-data/workspace-shell";
+import { WorkspaceHeader } from "@/components/master-data/workspace-shell";
+import { StatusChip } from "@/components/status-chip";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +40,7 @@ export default async function InvoiceWorkspacePage({
   const nextHref = `${basePath}?page=${result.filters.page + 1}${filterQuery}`;
 
   return <main className="entry-page entry-page-production invoice-workspace-page">
-    <div className="entry-workspace-bar"><strong>Hiiiive Billing</strong><span>{workspace.organizationName}</span><span className="entry-workspace-user">{workspace.userLabel} · {workspace.role}</span></div>
-    <MasterDataLinks workspace={workspace} current="invoices" />
+    <WorkspaceHeader workspace={workspace} current="invoices" />
     <header className="entry-header">
       <div><div className="entry-eyebrow">INVOICES</div><div className="entry-title-row"><h1>Invoice Workspace</h1></div></div>
       {canCreate && <Link className="entry-button entry-button-primary" href={`${basePath}/new`}>+ New Invoice</Link>}
@@ -142,21 +142,12 @@ function InvoiceActions({ row, basePath, role }: { row: InvoiceWorkspaceRow; bas
   </div>;
 }
 
-function StatusChip({ status }: { status: string }) {
-  const labels: Record<string, string> = {
-    DRAFT: "Draft", ISSUED: "Issued", SUPERSEDED: "Superseded", VOID: "Void", WRITTEN_OFF: "Written Off",
-    UNPAID: "Unpaid", PARTIALLY_PAID: "Partially Paid", PAID: "Paid",
-  };
-  return <span className={`invoice-status-chip invoice-status-${status.toLowerCase()}`}>{labels[status] ?? status}</span>;
-}
-
 function EmailStatus({ row }: { row: InvoiceWorkspaceRow }) {
   if (row.lifecycleStatus === "DRAFT") return <span className="invoice-quiet">—</span>;
-  const labels = { PENDING: "Sending", SENT: "Sent", PARTIALLY_SENT: "Partially sent", FAILED: "Failed" } as const;
   const status = row.latestEmailStatus;
-  if (!status) return <span className="invoice-email-state">Never sent</span>;
+  if (!status) return <StatusChip status="NEVER_SENT" />;
   const timestamp = row.latestEmailAt?.toISOString();
-  return <span className={`invoice-email-state invoice-email-${status.toLowerCase()}`} title={timestamp ? `Latest attempt: ${timestamp}` : undefined}>{labels[status]}</span>;
+  return <span title={timestamp ? `Latest attempt: ${timestamp}` : undefined}><StatusChip status={status} /></span>;
 }
 
 function formatDate(date: Date | null): string {

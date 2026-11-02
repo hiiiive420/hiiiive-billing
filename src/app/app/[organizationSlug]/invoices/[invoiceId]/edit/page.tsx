@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { InvoiceEntryForm } from "@/components/invoices/invoice-entry-form";
+import { WorkspaceHeader } from "@/components/master-data/workspace-shell";
 import { AuthorizationError, OrganizationContextNotFoundError, ProvisioningError, requireOrganizationBySlug } from "@/lib/auth/authorization";
 import { AuthenticationError } from "@/lib/auth/identity";
 import { loadDraftInvoiceForEditing } from "@/lib/invoices/invoice-entry-queries";
@@ -31,6 +32,7 @@ export default async function EditOrganizationDraftPage({ params }: { params: Pr
     invoiceId={invoiceId}
     initialDraft={draft}
     actions={{ searchClients, searchServices, saveDraftChanges, issueInvoice }}
+    workspaceHeader={<WorkspaceHeader workspace={workspace} current="invoices" />}
     presentation={{
       mode: "production",
       organizationName: workspace.organizationName,

@@ -4,6 +4,7 @@ import { hasPermission, requireOrganizationBySlug, AuthorizationError, Organizat
 import { loadClientDetail, MasterDataNotFoundError } from "@/lib/master-data/workspaces";
 import { ClientContactForm, ClientForm } from "@/components/master-data/forms";
 import { MasterDataAccessMessage, MasterDataShell } from "@/components/master-data/workspace-shell";
+import { StatusChip } from "@/components/status-chip";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +19,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ o
   const canEdit = hasPermission(workspace.role, "CLIENT_EDIT");
   const base = `/app/${encodeURIComponent(workspace.organizationSlug)}/clients`;
   return <MasterDataShell workspace={workspace} section="clients">
-    <header className="entry-header"><div><div className="entry-eyebrow"><Link href={base}>Clients</Link> <span>›</span> CLIENT</div><div className="entry-title-row"><h1>{client.name}</h1><span className={`master-data-status ${client.active ? "is-active" : "is-inactive"}`}>{client.active ? "Active" : "Inactive"}</span></div><p className="master-data-updated">Updated {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "Asia/Colombo" }).format(client.updatedAt)}</p></div></header>
+    <header className="entry-header"><div><div className="entry-eyebrow"><Link href={base}>Clients</Link> <span>›</span> CLIENT</div><div className="entry-title-row"><h1>{client.name}</h1><StatusChip status={client.active ? "ACTIVE" : "INACTIVE"} /></div><p className="master-data-updated">Updated {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "Asia/Colombo" }).format(client.updatedAt)}</p></div></header>
     {canEdit ? <ClientForm organizationSlug={workspace.organizationSlug} client={client} /> : <ClientReadOnly client={client} />}
     <section className="entry-card master-contact-section"><div className="entry-section-heading"><div><h2>Client contacts</h2><p>Contact details are scoped to this client.</p></div></div>
-      {client.contacts.length ? <div className="master-contact-list">{client.contacts.map((contact) => <article key={contact.id}><header><strong>{contact.name}</strong><span className={`master-data-status ${contact.active ? "is-active" : "is-inactive"}`}>{contact.active ? "Active" : "Inactive"}</span></header>{canEdit ? <ClientContactForm organizationSlug={workspace.organizationSlug} clientId={client.id} contact={contact} /> : <p>{[contact.email, contact.phone, contact.billingContact ? "Billing contact" : null, contact.primaryContact ? "Primary contact" : null].filter(Boolean).join(" · ") || "No additional details"}</p>}</article>)}</div> : <p className="master-data-note">No contacts have been added.</p>}
+      {client.contacts.length ? <div className="master-contact-list">{client.contacts.map((contact) => <article key={contact.id}><header><strong>{contact.name}</strong><StatusChip status={contact.active ? "ACTIVE" : "INACTIVE"} /></header>{canEdit ? <ClientContactForm organizationSlug={workspace.organizationSlug} clientId={client.id} contact={contact} /> : <p>{[contact.email, contact.phone, contact.billingContact ? "Billing contact" : null, contact.primaryContact ? "Primary contact" : null].filter(Boolean).join(" · ") || "No additional details"}</p>}</article>)}</div> : <p className="master-data-note">No contacts have been added.</p>}
       {canEdit && <div className="master-contact-new"><h3>Add contact</h3><ClientContactForm organizationSlug={workspace.organizationSlug} clientId={client.id} /> </div>}
     </section>
   </MasterDataShell>;
