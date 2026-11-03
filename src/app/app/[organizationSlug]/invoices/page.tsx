@@ -77,7 +77,7 @@ export default async function InvoiceWorkspacePage({
             <option value="date_asc">Oldest Invoice Date</option><option value="number_asc">Invoice Number</option>
           </select>
         </label>
-        <div className="invoice-filter-actions"><button className="entry-button entry-button-primary" type="submit">Apply</button>
+        <div className="invoice-filter-actions"><button className="entry-button entry-button-light" type="submit">Apply</button>
           {(result.filters.query || result.filters.lifecycle !== "ALL" || result.filters.payment !== "ALL" || result.filters.sort !== "updated_desc") && <Link className="entry-button entry-button-light" href={clearHref}>Clear filters</Link>}
         </div>
       </form>

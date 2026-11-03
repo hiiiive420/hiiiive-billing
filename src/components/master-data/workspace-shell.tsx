@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { hasPermission } from "@/lib/auth/authorization";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type Workspace = { organizationSlug: string; organizationName: string; userLabel: string; role: string };
 type WorkspaceArea = "invoices" | "clients" | "services" | "recurring" | "settings";
@@ -10,8 +11,10 @@ export function WorkspaceHeader({ workspace, current }: { workspace: Workspace; 
   return <div className="app-workspace-chrome">
     <div className="entry-workspace-bar">
       <Link className="app-workspace-brand" href="/app">Hiiiive Billing</Link>
+      <span className="workspace-brand-separator" aria-hidden="true" />
       <span className="app-workspace-organization">{workspace.organizationName}</span>
       <span className="entry-workspace-user">{workspace.userLabel} · {workspace.role}</span>
+      <ThemeToggle />
     </div>
     <nav className="master-data-nav" aria-label="Workspace navigation">
       {hasPermission(workspace.role, "INVOICE_READ") && <Link aria-current={current === "invoices" ? "page" : undefined} href={`${base}/invoices`}>Invoices</Link>}

@@ -139,7 +139,7 @@ export function InvoAssistant({ target, send, onApply, wrongModeHref }: {
     {view.open && <section className="invo-panel" role="dialog" aria-modal="false" aria-labelledby="invo-heading">
       <header className="invo-panel-header">
         <InvoAvatar size="header" />
-        <div className="invo-panel-brand"><h2 id="invo-heading">Invo</h2><p>{target === "INVOICE" ? "Invoice assistant" : "Recurring assistant"}</p><span>Powered by OpenAI</span></div>
+        <div className="invo-panel-brand"><h2 id="invo-heading">Invo</h2><p>{target === "INVOICE" ? "Invoice assistant" : "Recurring assistant"}</p></div>
         <div className="invo-panel-actions">
           <button type="button" className="invo-panel-icon-action" aria-label="Start over" onClick={reset} disabled={pending}>↻</button>
           <button type="button" className="invo-panel-icon-action" aria-label="Minimize Invo" onClick={minimize}>−</button>

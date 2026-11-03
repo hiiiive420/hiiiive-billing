@@ -16,7 +16,7 @@ export default async function RecurringWorkspacePage({ params, searchParams }: {
   const base = `/app/${encodeURIComponent(workspace.organizationSlug)}/recurring`;
   return <main className="entry-page entry-page-production"><WorkspaceHeader workspace={workspace} current="recurring" />
     <header className="entry-header"><div><div className="entry-eyebrow">WORKSPACE / BILLING</div><h1>Recurring invoices</h1><p>Plans create drafts for human review. They never issue or send invoices.</p></div><Link className="entry-button entry-button-primary" href={`${base}/new`}>New recurring plan</Link></header>
-    <form className="master-data-search" action={base}><label htmlFor="recurring-search">Search plans, clients, or projects</label><input id="recurring-search" name="q" defaultValue={query} maxLength={100} /><button className="entry-button entry-button-light">Search</button></form>
+    <form className="master-data-search" action={base}><label className="entry-field" htmlFor="recurring-search">Search plans, clients, or projects<input id="recurring-search" name="q" defaultValue={query} maxLength={100} /></label><button className="entry-button entry-button-light">Search</button></form>
     <section className="entry-card"><div className="recurring-table-wrap"><table className="recurring-table"><thead><tr><th>Plan</th><th>Client</th><th>Cadence</th><th>Total</th><th>Status</th><th>Next run</th><th>Last generated</th><th>Action</th></tr></thead><tbody>
       {plans.map((plan) => {
         const total = plan.items.reduce((sum, item) => sum.plus(item.billingMode === "FLAT_FEE" ? item.unitPrice : calculateInvoiceLineTotal(item.quantity, item.unitPrice)), new Prisma.Decimal(0)).minus(plan.discountAmount);
