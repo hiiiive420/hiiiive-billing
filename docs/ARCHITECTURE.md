@@ -46,6 +46,10 @@ Organization settings are served at `/app/[organizationSlug]/settings` and each 
 
 The conventional invoice entry UI lives at `/dev/invoices/new` and `/dev/invoices/[invoiceId]/edit`; both are development-only and return not-found in production. The same responsive form supports create and edit modes. It calls the existing organization-scoped client/service searches, `loadDraftInvoiceForEditing()`, and draft services through development-only Server Actions/server components. An isolated development helper upserts the fixed `hiiiive` organization and deterministic sample client/service; it is unavailable in production. Organization IDs, lifecycle fields, and persisted totals are not read from form input. The form's decimal-string/BigInt calculations are display previews only. New drafts use `createDraftInvoice()`. Full invoice-form draft edits must use `updateFullDraftInvoice()` so the header, client, currency, discount, notes, payment terms, complete item list, and totals commit atomically; the UI must not chain `updateDraftInvoice()` and `replaceDraftInvoiceItems()`.
 
+## Application design system
+
+The shared application UI uses centralized CSS custom properties in `src/app/globals.css`: Hiiiive Midnight `#0E1A2E` for primary actions and authority, Cyan `#4DC2D7` for selected and focus states, and Champagne `#D6B36A` for restrained status and Invo accents. Off-white canvas, white surfaces, cool secondary surfaces, shared text roles, semantic statuses, and consistent control states are defined alongside these brand tokens. Application styles are scoped to the workspace UI; `src/app/invoice-print.css` remains separate so the approved A4/PDF renderer is not restyled by UI changes.
+
 ## Architectural guardrails
 
 - MVP1 serves one organization, Hiiiive. Model organization ownership with `organizationId` so future multi-tenant SaaS use is possible.

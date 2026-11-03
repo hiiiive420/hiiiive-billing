@@ -293,7 +293,6 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
           <div className="entry-total-line"><span>Discount</span><strong>− {currency} {formatMoneyDisplay(preview.discount)}</strong></div>
           <div className="entry-total-payable"><span>Amount payable</span><strong>{currency} {formatMoneyDisplay(preview.payable)}</strong></div>
           <p className="entry-preview-note">Preview only. Final totals are calculated and validated when saved.</p>
-          <button className="entry-button entry-button-light entry-summary-save" type="button" onClick={() => void saveLatest()} disabled={saveState === "SAVING"}>Save now</button>
         </aside>
       </div>
       <footer className="entry-footer">{presentation.mode === "development" && <span>Development entry only</span>}<span>Invoice totals are confirmed by the server on save.</span></footer>
@@ -386,7 +385,7 @@ function InvoiceItemRow({ item, index, count, currency, disabled, searchServices
       <div className="entry-item-price"><label htmlFor={`price-${item.key}`}>Unit Price ({currency})</label><MoneyInput id={`price-${item.key}`} value={item.unitPrice} onChange={(value) => onChange({ unitPrice: value, useServiceDefaultPrice: false })} placeholder="0.00" disabled={disabled} /></div>
     </> : <div className="entry-item-price entry-item-flat-amount"><label htmlFor={`amount-${item.key}`}>Amount ({currency})</label><MoneyInput id={`amount-${item.key}`} value={item.amount} onChange={(value) => onChange({ amount: value, useServiceDefaultPrice: false })} placeholder="0.00" disabled={disabled} /></div>}
     <div className="entry-item-amount"><span>Amount</span><strong>{amount === "—" ? amount : `${currency} ${formatMoneyDisplay(amount)}`}</strong></div>
-    <div className="entry-item-controls"><span className="entry-item-order">{String(index + 1).padStart(2, "0")}</span><button type="button" aria-label={`Move item ${index + 1} up`} onClick={() => onMove(-1)} disabled={disabled || index === 0}>↑</button><button type="button" aria-label={`Move item ${index + 1} down`} onClick={() => onMove(1)} disabled={disabled || index === count - 1}>↓</button><button type="button" aria-label={`Remove item ${index + 1}`} className="entry-remove-button" onClick={onRemove} disabled={disabled}>×</button></div>
+    <div className="entry-item-controls"><span className="entry-item-order">{String(index + 1).padStart(2, "0")}</span><button type="button" aria-label={`Move item ${index + 1} up`} title="Move up" onClick={() => onMove(-1)} disabled={disabled || index === 0}>↑</button><button type="button" aria-label={`Move item ${index + 1} down`} title="Move down" onClick={() => onMove(1)} disabled={disabled || index === count - 1}>↓</button><button type="button" aria-label={`Remove item ${index + 1}`} title="Remove item" className="entry-remove-button" onClick={onRemove} disabled={disabled}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2m3 0-.7 10H5.7L5 6m3 3v4m4-4v4" /></svg></button></div>
   </div>;
 }
 

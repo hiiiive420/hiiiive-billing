@@ -5,6 +5,7 @@ import { calculateInvoiceLineTotal } from "@/lib/invoices/invoice-financials";
 import { WorkspaceHeader } from "@/components/master-data/workspace-shell";
 import { requireOrganizationBySlug } from "@/lib/auth/authorization";
 import { listRecurringPlans } from "@/lib/recurring/recurring-invoices";
+import { StatusChip } from "@/components/status-chip";
 
 export default async function RecurringWorkspacePage({ params, searchParams }: { params: Promise<{ organizationSlug: string }>; searchParams: Promise<{ q?: string }> }) {
   const { organizationSlug } = await params;
@@ -19,7 +20,7 @@ export default async function RecurringWorkspacePage({ params, searchParams }: {
     <section className="entry-card"><div className="recurring-table-wrap"><table className="recurring-table"><thead><tr><th>Plan</th><th>Client</th><th>Cadence</th><th>Total</th><th>Status</th><th>Next run</th><th>Last generated</th><th>Action</th></tr></thead><tbody>
       {plans.map((plan) => {
         const total = plan.items.reduce((sum, item) => sum.plus(item.billingMode === "FLAT_FEE" ? item.unitPrice : calculateInvoiceLineTotal(item.quantity, item.unitPrice)), new Prisma.Decimal(0)).minus(plan.discountAmount);
-        return <tr key={plan.id}><td><Link href={`${base}/${encodeURIComponent(plan.id)}`}>{plan.name}</Link>{plan.projectTitle && <small>{plan.projectTitle}</small>}</td><td>{plan.client.name}</td><td>{plan.frequency === "MONTHLY" ? "Monthly" : "Yearly"}</td><td>{plan.currencyCode} {total.toString()}</td><td>{plan.isActive ? "Active" : "Paused"}</td><td>{plan.nextRunDate.toISOString().slice(0, 10)}</td><td>{plan.runs[0]?.status === "GENERATED" ? plan.runs[0].scheduledFor.toISOString().slice(0, 10) : plan.runs[0]?.status === "FAILED" ? "Failed" : "—"}</td><td><Link href={`${base}/${encodeURIComponent(plan.id)}`}>View / Edit</Link></td></tr>;
+        return <tr key={plan.id}><td><Link href={`${base}/${encodeURIComponent(plan.id)}`}>{plan.name}</Link>{plan.projectTitle && <small>{plan.projectTitle}</small>}</td><td>{plan.client.name}</td><td>{plan.frequency === "MONTHLY" ? "Monthly" : "Yearly"}</td><td>{plan.currencyCode} {total.toString()}</td><td><StatusChip status={plan.isActive ? "ACTIVE" : "PAUSED"} /></td><td>{plan.nextRunDate.toISOString().slice(0, 10)}</td><td>{plan.runs[0]?.status === "GENERATED" ? <><StatusChip status="GENERATED" /> {plan.runs[0].scheduledFor.toISOString().slice(0, 10)}</> : plan.runs[0]?.status === "FAILED" ? <StatusChip status="FAILED" /> : "—"}</td><td><Link href={`${base}/${encodeURIComponent(plan.id)}`}>View / Edit</Link></td></tr>;
       })}
       {plans.length === 0 && <tr><td colSpan={8}>No recurring plans found.</td></tr>}
     </tbody></table></div></section>
