@@ -6,6 +6,8 @@ Local development uses the locally installed PostgreSQL server at `localhost:543
 
 The initial Prisma migration is `20261020151624_init_master_data` (`init_master_data`). It creates Organization, Client, ClientContact, and Service. Later migrations add the RBAC foundation (`add_user_rbac_foundation`), invoice core (`add_invoice_core`), payments/reworked invoice relations (`add_payments_and_invoice_relations`), replacement lineage enforcement (`enforce_replacement_lineage`), invoice template versioning (`add_invoice_template_versioning`), template version immutability (`enforce_template_version_immutability`), optional invoice project titles (`add_invoice_project_title`), template selection/freeze enforcement (`freeze_invoice_template_at_issuance`), and `20261023060949_add_invoice_item_billing_mode`, which adds the `InvoiceItemBillingMode` enum and a non-null `billingMode` column defaulting to `QUANTITY` without changing existing financial values. `20261023181221_add_invoice_email_attempts` adds the tenant-scoped email-attempt audit table and status enum. `20261023183000_guard_invoice_email_attempt_immutability` adds terminal-state checks and a trigger protecting audit snapshots. Use `npm run db:migrate -- --name <migration_name>` to create and apply future development migrations, and `npm run db:migrate:status` to inspect migration state. Never commit `.env` or document local passwords.
 
+INV-031 Invo adds no Prisma models, columns, enums, or migrations. Conversation and proposal state are transient page state.
+
 ## Implemented Prisma models
 
 ### Organization

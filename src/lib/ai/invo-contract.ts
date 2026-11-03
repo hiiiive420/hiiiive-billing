@@ -1,0 +1,41 @@
+export type InvoTarget = "INVOICE" | "RECURRING";
+export type InvoRole = "user" | "assistant";
+export type InvoMessage = Readonly<{ role: InvoRole; content: string }>;
+export type InvoDefaultPriceOffer = Readonly<{ token: string; itemIndex: number; serviceName: string; currencyCode: string; amount: string }>;
+export type InvoItemProposal = Readonly<{
+  billingMode: "QUANTITY" | "FLAT_FEE";
+  serviceHint: string | null;
+  description: string | null;
+  quantity: string | null;
+  unitPrice: string | null;
+  amount: string | null;
+}>;
+export type InvoProposal = Readonly<{
+  clientHint: string | null;
+  planName: string | null;
+  projectTitle: string | null;
+  invoiceDate: string | null;
+  dueDate: string | null;
+  dueInDays: number | null;
+  currencyCode: string | null;
+  frequency: "MONTHLY" | "YEARLY" | null;
+  startDate: string | null;
+  discountLabel: string | null;
+  discountAmount: string | null;
+  paymentTerms: string | null;
+  notes: string | null;
+  items: readonly InvoItemProposal[];
+}>;
+export type InvoResult = Readonly<{
+  state: "ASK_USER" | "READY_PROPOSAL";
+  assistantMessage: string;
+  target: InvoTarget;
+  missingFields: readonly string[];
+  ambiguities: readonly string[];
+  proposal: InvoProposal;
+  resolvedClient: Readonly<{ id: string; name: string }> | null;
+  clientSuggestions: readonly Readonly<{ id: string; name: string }>[];
+  resolvedServices: readonly (Readonly<{ id: string; name: string; defaultUnitPrice: string | null; currencyCode: string }> | null)[];
+  defaultPriceOffers: readonly InvoDefaultPriceOffer[];
+}>;
+export type InvoActionResult = Readonly<{ ok: true; result: InvoResult }> | Readonly<{ ok: false; error: string }>;

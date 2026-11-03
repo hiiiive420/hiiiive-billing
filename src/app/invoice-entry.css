@@ -191,6 +191,76 @@
 .invoice-ai-notes { border-left: 3px solid #d6a84c; padding: 5px 10px; color: #775d2c; background: #fffaf0; font-size: 12px; }
 .invoice-ai-notes ul { margin-top: 4px; }
 .invoice-ai-suggestion > button { justify-self: start; }
+.invo-floating-root { position: fixed; z-index: 120; right: 24px; bottom: max(20px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 12px; pointer-events: none; }
+.invo-floating-root > * { pointer-events: auto; }
+.invo-avatar { flex: 0 0 auto; display: block; object-fit: contain; }
+.invo-avatar-trigger { width: 88px; height: 88px; }
+.invo-avatar-header { width: 46px; height: 46px; }
+.invo-avatar-message { width: 30px; height: 30px; margin-top: 2px; padding: 1px; border: 1px solid #e4d6b7; border-radius: 50%; background: #fffaf0; }
+.invo-float-trigger { display: grid; place-items: center; width: 96px; height: 96px; padding: 3px; border: 1px solid #ead8ad; border-radius: 50%; background: #fff; box-shadow: 0 8px 25px #243a352b; cursor: pointer; transition: transform .16s ease, box-shadow .16s ease; }
+.invo-float-trigger:hover { transform: translateY(-2px); box-shadow: 0 11px 28px #243a3533; }
+.invo-greeting { position: relative; display: flex; align-items: flex-start; gap: 7px; max-width: min(282px, calc(100vw - 36px)); border: 1px solid #e9dfc4; border-radius: 12px; padding: 8px 9px 8px 13px; color: #354843; background: #fff; box-shadow: 0 7px 22px #243a351c; }
+.invo-greeting::after { position: absolute; right: 35px; bottom: -7px; width: 12px; height: 12px; border-right: 1px solid #e9dfc4; border-bottom: 1px solid #e9dfc4; background: #fff; content: ""; transform: rotate(45deg); }
+.invo-greeting > button:first-child { border: 0; padding: 0; color: inherit; background: transparent; text-align: left; font: inherit; font-size: 13px; cursor: pointer; }
+.invo-greeting > button:last-child { flex: 0 0 auto; width: 26px; height: 26px; border: 0; border-radius: 50%; color: #74827f; background: transparent; font-size: 18px; line-height: 1; cursor: pointer; }
+.invo-panel { display: flex; flex-direction: column; width: min(430px, calc(100vw - 40px)); height: min(760px, calc(100dvh - 40px)); min-height: 360px; overflow: hidden; border: 1px solid #dfe7e4; border-radius: 16px; background: #f9fbfa; box-shadow: 0 14px 50px #1f35333d; }
+.invo-panel-header { display: flex; align-items: center; gap: 10px; min-height: 72px; border-bottom: 1px solid #e6ecea; padding: 11px 14px; background: #fff; }
+.invo-panel-brand { min-width: 0; flex: 1; }
+.invo-panel-brand h2 { margin: 0; color: #26383a; font-size: 16px; line-height: 1.2; }
+.invo-panel-brand p { margin: 2px 0 0; color: #53655f; font-size: 12px; }
+.invo-panel-brand span { color: #929e9a; font-size: 10px; }
+.invo-panel-actions { display: flex; gap: 5px; }
+.invo-panel-icon-action { width: 36px; height: 36px; border: 1px solid #e4e9e7; border-radius: 9px; color: #52645e; background: #fff; font: inherit; font-size: 19px; cursor: pointer; }
+.invo-panel-icon-action:disabled { opacity: .45; cursor: default; }
+.invo-conversation { display: flex; flex: 1 1 auto; flex-direction: column; align-items: stretch; gap: 12px; min-height: 0; overflow-y: auto; padding: 16px 14px; scroll-behavior: smooth; }
+.invo-empty-state { display: grid; gap: 12px; padding: 5px 0; }
+.invo-empty-state > p { margin: 0; color: #53645f; font-size: 13px; }
+.invo-starter-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.invo-starter-chips button { min-height: 34px; border: 1px solid #e4e9e6; border-radius: 18px; padding: 5px 10px; color: #49645a; background: #fff; font: inherit; font-size: 11px; cursor: pointer; }
+.invo-starter-chips button:hover { border-color: #d8bf80; background: #fffbf1; }
+.invo-message-row { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.invo-row-user { justify-content: flex-end; }
+.invo-message { max-width: min(88%, 340px); min-width: 0; border: 1px solid #e5ece9; border-radius: 12px; padding: 9px 12px; background: #fff; }
+.invo-message p { margin: 3px 0 0; color: #3b4b48; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.invo-message strong { color: #58726a; font-size: 10px; }
+.invo-user { border-color: #dcebe4; background: #edf6f2; }
+.invo-thinking { align-self: flex-start; margin: 0 0 0 38px; color: #71827d; font-size: 12px; }
+.invo-applied-note { margin: 0; border-left: 3px solid #d6b25f; border-radius: 4px; padding: 8px 10px; color: #53645f; background: #fffaf0; font-size: 12px; }
+.invo-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 9px; flex: 0 0 auto; border-top: 1px solid #e6ecea; padding: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: #fff; }
+.invo-composer textarea { width: 100%; min-height: 44px; max-height: 132px; resize: vertical; border: 1px solid #dce5e2; border-radius: 9px; padding: 10px 11px; color: #334448; background: #fff; font: inherit; font-size: 13px; }
+.invo-composer button { min-height: 42px; }
+.invo-hidden-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.invo-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; border-radius: 8px; padding: 8px 10px; color: #a43c33; background: #fff3f1; font-size: 12px; }
+.invo-review { display: grid; gap: 12px; border-top: 1px solid #e5ece9; padding-top: 16px; }
+.invo-review-title > div > span { color: #55816d; font-size: 10px; font-weight: 750; letter-spacing: .08em; }
+.invo-review-title h3 { margin-top: 3px; font-size: 16px; }
+.invo-review-badge { padding: 5px 8px; border-radius: 99px; color: #725a2b; background: #fff7e4; font-size: 10px; font-weight: 700; }
+.invo-review dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; margin: 0; }
+.invo-review dl > div { min-width: 0; }
+.invo-review dt { margin-bottom: 3px; color: #7e8e8e; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.invo-review dd { margin: 0; color: #334448; font-size: 13px; overflow-wrap: anywhere; }
+.invo-review ul { margin: 0; padding-left: 18px; }
+.invo-review li + li { margin-top: 6px; }
+.invo-review li small { display: block; color: #82908d; }
+.invo-review-actions { justify-content: flex-start; flex-wrap: wrap; }
+.invo-suggestions { color: #725a2b; font-size: 12px; }
+.invo-mode-link { align-self: flex-start; border: 1px solid #dfe7e4; border-radius: 7px; padding: 7px 10px; color: #376c5e; background: #fff; font-size: 12px; font-weight: 650; text-decoration: none; }
+.invo-mode-link:hover { background: #f3f8f5; }
+@media (max-width: 600px) {
+  .invo-floating-root { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }
+  .invo-float-trigger { width: 70px; height: 70px; }
+  .invo-avatar-trigger { width: 64px; height: 64px; }
+  .invo-greeting { max-width: min(260px, calc(100vw - 28px)); }
+  .invo-panel { position: fixed; inset: 6px 6px max(6px, env(safe-area-inset-bottom)); width: auto; height: auto; min-height: 0; max-height: none; border-radius: 16px; }
+  .invo-panel-header { min-height: 66px; }
+  .invo-conversation { padding: 14px 12px; }
+  .invo-composer { grid-template-columns: minmax(0, 1fr) auto; padding-inline: 10px; }
+  .invo-review-title { align-items: flex-start; }
+  .invo-review-badge { flex: 0 0 auto; }
+  .invo-review dl { grid-template-columns: 1fr; gap: 8px; }
+  .invo-review-actions { display: grid; grid-template-columns: 1fr; }
+  .invo-review-actions button { width: 100%; }
+}
 .email-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); align-items: start; gap: 18px; max-width: 1120px; margin: 0 auto; }
 .email-compose { display: grid; gap: 15px; }
 .email-compose textarea { resize: vertical; }

@@ -2,17 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { InvoAssistant } from "@/components/invoices/invo-assistant";
+import type { InvoActionResult, InvoMessage, InvoResult, InvoTarget } from "@/lib/ai/invo-contract";
 
 type Client = { id: string; name: string };
-type Item = { billingMode: "QUANTITY" | "FLAT_FEE"; description: string; quantity: string; unitPrice: string; amount: string };
+type Item = { billingMode: "QUANTITY" | "FLAT_FEE"; serviceId?: string | null; description: string; quantity: string; unitPrice: string; amount: string };
 type Initial = {
   clientId: string; name: string; projectTitle: string; currencyCode: string; frequency: "MONTHLY" | "YEARLY";
   startDate: string; dueInDays: string; discountLabel: string; discountAmount: string; paymentTerms: string; notes: string;
   items: Item[];
 };
 
-export function RecurringPlanForm({ organizationSlug, clients, save, planId, initial }: {
+export function RecurringPlanForm({ organizationSlug, clients, save, planId, initial, invo }: {
   organizationSlug: string; clients: Client[];
+  invo?: (target: InvoTarget, messages: readonly InvoMessage[], offers: readonly string[]) => Promise<InvoActionResult>;
   save: (planId: string | null, value: unknown) => Promise<{ ok: true; planId: string } | { ok: false; error: string }>;
   planId?: string; initial?: Initial;
 }) {
@@ -35,7 +38,23 @@ export function RecurringPlanForm({ organizationSlug, clients, save, planId, ini
       router.refresh();
     });
   }
+  function applyInvo(result: InvoResult) {
+    const proposal = result.proposal;
+    setForm((current) => ({
+      ...current,
+      clientId: result.resolvedClient?.id ?? "", name: proposal.planName ?? "", projectTitle: proposal.projectTitle ?? "",
+      currencyCode: proposal.currencyCode ?? "", frequency: proposal.frequency ?? "MONTHLY", startDate: proposal.startDate ?? "",
+      dueInDays: proposal.dueInDays === null ? "" : String(proposal.dueInDays), discountLabel: proposal.discountLabel ?? "", discountAmount: proposal.discountAmount ?? "0",
+      paymentTerms: proposal.paymentTerms ?? "", notes: proposal.notes ?? "",
+      items: proposal.items.map((item, index) => ({
+        billingMode: item.billingMode, serviceId: result.resolvedServices[index]?.id ?? null,
+        description: item.description ?? item.serviceHint ?? "", quantity: item.billingMode === "QUANTITY" ? item.quantity ?? "" : "1",
+        unitPrice: item.billingMode === "QUANTITY" ? item.unitPrice ?? "" : "", amount: item.billingMode === "FLAT_FEE" ? item.amount ?? "" : "",
+      })),
+    }));
+  }
   return <section className="entry-card recurring-form">
+    {invo && <InvoAssistant target="RECURRING" send={invo} onApply={applyInvo} wrongModeHref={`/app/${encodeURIComponent(organizationSlug)}/invoices/new`} />}
     <div className="entry-field-grid">
       <Field label="Plan name"><input value={form.name} maxLength={120} onChange={(e) => change("name", e.target.value)} /></Field>
       <Field label="Client"><select value={form.clientId} onChange={(e) => change("clientId", e.target.value)}><option value="">Choose a client</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field>

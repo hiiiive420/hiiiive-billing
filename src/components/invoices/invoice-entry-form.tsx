@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IssueInvoiceControl } from "./issue-invoice-control";
-import { InvoiceIntentQuickEntry } from "./invoice-intent-quick-entry";
+import { InvoAssistant } from "./invo-assistant";
 import {
   calculateInvoicePreview,
   DEFAULT_INVOICE_BILLING_MODE,
@@ -23,9 +23,8 @@ import {
   type InvoiceEntryDraftData,
   type InvoiceEntryServiceDisplay,
 } from "@/lib/invoices/invoice-entry-ui";
-import { mapInvoiceIntentSuggestionToForm } from "@/lib/invoices/invoice-intent-form";
 import { runSingleFlight } from "@/lib/invoices/autosave-single-flight";
-import type { InvoiceIntentSuggestion } from "@/lib/ai/invoice-intent-contract";
+import type { InvoActionResult, InvoMessage, InvoResult, InvoTarget } from "@/lib/ai/invo-contract";
 
 type Client = { id: string; name: string; billingAddress: string | null; email: string | null; phone: string | null; active?: boolean };
 type Service = InvoiceEntryServiceDisplay;
@@ -38,7 +37,7 @@ export type InvoiceEntryFormActions = {
   saveDraft?: (value: unknown) => Promise<ActionResult<{ invoiceId: string }>>;
   saveDraftChanges?: (invoiceId: string, value: unknown) => Promise<ActionResult>;
   issueInvoice?: (invoiceId?: string) => Promise<{ ok: true; invoiceId: string; invoiceNumber: string } | { ok: false; error: string }>;
-  generateIntent?: (text: string) => Promise<import("@/lib/ai/invoice-intent-contract").InvoiceIntentActionResult>;
+  invo?: (target: InvoTarget, messages: readonly InvoMessage[], offers: readonly string[]) => Promise<InvoActionResult>;
 };
 export type InvoiceEntryPresentation = {
   mode: "development" | "production";
@@ -183,33 +182,35 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
     setSavedInvoiceId(""); invoiceIdRef.current = ""; revisionRef.current = 0; setSaveState("NOT_SAVED"); setFormDirty(false); setFormError("");
   }
 
-  function applyInvoiceIntent(suggestion: InvoiceIntentSuggestion) {
-    const patch = mapInvoiceIntentSuggestionToForm(suggestion, currentColomboDate());
-    setClientQuery(patch.clientQuery);
-    setClients(patch.selectedClient ? [patch.selectedClient] : []);
-    setSelectedClient(patch.selectedClient);
+  function applyInvo(result: InvoResult) {
+    const proposal = result.proposal;
+    const selectedClient = result.resolvedClient ? { id: result.resolvedClient.id, name: result.resolvedClient.name, billingAddress: null, email: null, phone: null, active: true } : null;
+    setClientQuery(selectedClient?.name ?? proposal.clientHint ?? "");
+    setClients(selectedClient ? [selectedClient] : []);
+    setSelectedClient(selectedClient);
     setClientError("");
-    setProjectTitle(patch.projectTitle);
-    setInvoiceDate(patch.invoiceDate);
-    setDueDate(patch.dueDate);
-    setCurrency(patch.currency);
+    setProjectTitle(proposal.projectTitle ?? "");
+    setInvoiceDate(proposal.invoiceDate ?? "");
+    setDueDate(proposal.dueDate ?? (proposal.dueInDays === null ? "" : addCalendarDays(proposal.invoiceDate ?? currentColomboDate(), proposal.dueInDays)));
+    setCurrency(proposal.currencyCode ?? "");
     setOriginalCurrency("LKR");
-    setCurrencyChanged(patch.currency !== "LKR");
-    setPaymentTerms(patch.paymentTerms);
-    setItems(patch.items.map((item) => ({ ...item })));
-    nextItemKey.current = patch.items.length;
-    setDiscountLabel(patch.discountLabel);
-    setDiscountAmount(patch.discountAmount);
-    setNotes(patch.notes);
+    setCurrencyChanged(proposal.currencyCode !== "LKR");
+    setPaymentTerms(proposal.paymentTerms ?? "");
+    const items: Item[] = proposal.items.map((item, index) => ({
+      key: `invo-${Date.now()}-${index}`, position: index, billingMode: item.billingMode,
+      serviceId: result.resolvedServices[index]?.id ?? null, serviceQuery: result.resolvedServices[index]?.name ?? item.serviceHint ?? "", selectedService: null,
+      description: item.description ?? item.serviceHint ?? "", quantity: item.billingMode === "QUANTITY" ? item.quantity ?? "" : "1",
+      unitPrice: item.billingMode === "QUANTITY" ? item.unitPrice ?? "" : "", amount: item.billingMode === "FLAT_FEE" ? item.amount ?? "" : "", useServiceDefaultPrice: false,
+    }));
+    setItems(items.length ? items : [initialItem()]);
+    nextItemKey.current = items.length;
+    setDiscountLabel(proposal.discountLabel ?? "");
+    setDiscountAmount(proposal.discountAmount ?? "0");
+    setNotes(proposal.notes ?? "");
     markFormDirty();
     setFormError("");
   }
 
-  const hasExistingFormData = Boolean(
-    selectedClient || clientQuery.trim() || projectTitle.trim() || invoiceDate || dueDate ||
-    currency !== "LKR" || paymentTerms.trim() || notes.trim() || discountLabel.trim() || discountAmount !== "0" ||
-    items.some((item) => itemHasMeaningfulContent(item) || item.quantity !== "1"),
-  );
   const persistedInvoiceId = invoiceIdRef.current || savedInvoiceId || invoiceId || "";
   const canIssue = Boolean(persistedInvoiceId && actions.issueInvoice && saveState === "SAVED" && !formDirty);
   async function openPreview() {
@@ -243,11 +244,7 @@ export function InvoiceEntryForm({ invoiceId, initialDraft, actions, presentatio
       {presentation.mode === "development" && savedInvoiceId && <div className="entry-success" role="status"><strong>Draft saved.</strong> Draft ID: <code>{savedInvoiceId}</code><button type="button" onClick={startAnotherDraft}>Create another draft</button></div>}
       {formError && <div className="entry-error" role="alert">{formError}</div>}
 
-      {presentation.mode === "production" && !editing && !savedInvoiceId && actions.generateIntent && <InvoiceIntentQuickEntry
-        generate={actions.generateIntent}
-        hasExistingData={hasExistingFormData}
-        onApply={applyInvoiceIntent}
-      />}
+      {presentation.mode === "production" && !editing && !savedInvoiceId && actions.invo && <InvoAssistant target="INVOICE" send={actions.invo} onApply={applyInvo} wrongModeHref={`${presentation.editBasePath.replace(/\/invoices$/, "")}/recurring/new`} />}
 
       <div className="entry-layout">
         <div className="entry-main-column">
@@ -310,6 +307,13 @@ function currentColomboDate(): string {
   }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
+}
+
+function addCalendarDays(value: string, days: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isSafeInteger(days) || days < 0) return "";
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : "";
 }
 
 function InvoiceItemRow({ item, index, count, currency, disabled, searchServices, onChange, onRemove, onMove, amount }: {

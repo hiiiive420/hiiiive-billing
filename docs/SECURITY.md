@@ -92,13 +92,13 @@ Outside production, `DEV_AUTH_EMAIL` provides a deliberately explicit server-onl
 - The compose route uses only the frozen client email snapshot as its suggested To value. The official issued PDF is generated from the trusted frozen document loader and attached in memory; no client file or path is accepted.
 - A `PENDING` audit snapshot is persisted before PDF generation and SMTP. SMTP runs outside database transactions. The row can transition once to `SENT` or `FAILED`; PostgreSQL rejects deletion, terminal mutation, and snapshot rewrites. Failure messages returned to the browser and persisted for display are fixed safe text and never include SMTP credentials/provider internals. A resend creates a new audit row.
 
-### AI invoice suggestions
+### Invo conversational proposals
 
-- Quick Invoice parsing is available only through a Server Action that authenticates the request, resolves the URL slug through the user's active membership, and requires `INVOICE_CREATE` before calling OpenAI. Viewer and foreign-organization requests are denied before the parser runs.
-- Browser input contains only the natural-language text. Organization, user, role, model, API key, client IDs, and service IDs are server-derived or never accepted. Input is text-only and capped at 2,000 characters.
-- The OpenAI request includes no JWT, user email, organization UUID, database identifiers, client/service lists, invoices, payments, or SMTP data. It uses `store: false`, stateless Responses structured output, a strict schema, no tools, no web search, and no retries. The API key stays in server environment configuration.
-- Suggestions and natural-language text are transient and are not written to the database. Tenant-scoped exact unique matching reads only active records in the authorized organization; ambiguous or absent matches are not guessed. Returned data is limited to fields needed by the form.
-- AI output cannot mutate invoices or financial data. The UI keeps the suggestion separate until explicit user Apply; normal server validation and Save Draft remain authoritative. Errors are replaced with a fixed safe fallback and the ordinary invoice form remains usable.
+- Every Invo Server Action resolves the route slug through the caller's active membership and requires centralized `INVO_USE` plus `INVOICE_CREATE` or `RECURRING_INVOICE_MANAGE` for the target. VIEWER and foreign-organization requests are denied before OpenAI is called. Applying still relies on the target form's existing permissions.
+- The browser may send only a target enum and a bounded conversation (at most 14 messages, 2,000 characters each, and 8,000 total). Organization, role, model, API key, and trusted IDs are server-derived or never accepted. User text is treated as untrusted data.
+- The server sends strict Responses API Structured Outputs with `store: false`, no tools/search, timeout and no retry. Candidate context is bounded, contains only active same-organization client/service names and needed service default metadata, and never includes organization IDs, raw JWTs, user email, invoice/payment data, SMTP data, or environment secrets. The OpenAI API key stays server-only.
+- The model cannot provide Client/Service IDs. The server re-resolves exact unique matches within trusted tenant scope and uses only those IDs in a transient proposal. Missing, ambiguous, or foreign records do not become trusted selections. Service default price use requires an explicit user confirmation and matching currency.
+- Invo has no Prisma write path and never invokes draft/plan creation, issuance, invoice numbering, email, or payment services. ASK_USER and READY_PROPOSAL responses are read-only. The proposal remains separate until explicit user Apply; invoice autosave and recurring Create plan then follow their existing deterministic paths. Errors use a fixed safe message, preserve form state, and leave manual entry available.
 
 ## Audit trail
 

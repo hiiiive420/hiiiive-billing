@@ -65,13 +65,14 @@ These rules are authoritative for MVP1. If a requirement conflicts with them or 
 - `Service.currencyCode` describes the currency of `defaultUnitPrice`. Do not auto-fill or convert a service default price when it differs from the invoice currency; require an explicit invoice unit price in the invoice currency.
 - A future conventional invoice form will expose a Currency selector defaulting to LKR. Example choices include LKR, USD, CAD, GBP, EUR, and AUD.
 
-## AI invoice suggestions
+## Invo conversational proposals
 
-- Quick Invoice with AI is an optional extraction aid on the production new-invoice page. AI output is a suggestion, not invoice truth. A user must review it and explicitly apply it to the normal editable form; the ordinary Save Draft action is still required.
-- The model may suggest client/service names but never supplies trusted database IDs. Resolve a name only against active records in the authenticated organization and only when exactly one normalized exact match exists. Unmatched or duplicate names remain unresolved for normal user search/selection.
-- The AI never supplies subtotal, line total, grand total, invoice number, lifecycle/payment status, sequence, or template identity. Existing server financial functions calculate and validate all totals. A matched service does not apply its default price; any extracted price remains a user-reviewed suggestion.
-- Currency must be explicit and unambiguous. Never guess an unqualified `$`, default an AI result to LKR, or convert currency. Percentage discounts are unsupported; require a fixed discount amount. Missing or ambiguous details remain visible for user completion.
-- Relative due days are applied deterministically in the application using an explicit invoice date when present, otherwise the current Asia/Colombo date. AI cannot save, issue, number, email, or record payment.
+- Invo is an optional conversational proposal assistant on the invoice and recurring creation pages. Its target is fixed by the page. It asks for missing required information and presents a structured review; the user must explicitly Apply to the normal target form.
+- Conversation and proposal state are bounded to the current page session and are not persisted. The model uses strict structured output and returns money and quantity values as strings; it never returns authoritative totals, invoice numbers, lifecycle/payment state, or trusted database IDs.
+- Server-side deterministic validation decides whether a proposal is ready. It requires a unique active same-organization Client, valid currency and item financial structure; recurring also requires MONTHLY or YEARLY frequency, a plan name, and a valid first date. Ambiguous `$` must be clarified. No currency conversion or default-to-LKR behavior is allowed.
+- Client and Service matching is tenant-scoped and bounded. A Service default price is proposed only with an explicit confirmation, and a currency mismatch requires a user-entered price. An unmatched Service may be left unlinked with a free-form item. No Client or Service is created or modified.
+- Applying an invoice proposal only populates the normal invoice form; the existing autosave/draft behavior then applies. Applying a recurring proposal only populates the normal recurring form; the user must still click Create plan. Invo itself never creates drafts/plans, issues, numbers, emails, or records payments. Existing server financial services remain authoritative for Decimal validation and totals.
+- Invo requires the centralized `INVO_USE` permission plus the target's existing create/manage permission. ADMIN and BILLING have access; VIEWER does not. No browser-supplied organization ID is trusted. AI failures leave manual entry available.
 ## Invoice templates
 
 - MVP1 uses the Hiiiive invoice template. Template records are organization-scoped; future SaaS may support multiple templates per organization.
