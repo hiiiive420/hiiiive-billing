@@ -1,192 +1,170 @@
 # Codex Handoff
 
-## UI-002B — Premium AI Visual Refinement
-
-### Status and Scope
-Implemented on the existing uncommitted UI-002/UI-002A work at baseline `381223c`. No commit was created. Billing logic, invoice calculations, recurring behavior, Invo/OpenAI requests and proposal handling, RBAC, schema, migrations, routes, and invoice print/PDF rendering were not changed.
-
-### Header and Navigation
-The application shell no longer paints as a boxed header rectangle. The identity row has a restrained divider between “Hiiiive Billing” and the secondary organization name, with user/role metadata and the icon-only theme control aligned to the right. The nav row uses one subtle bottom divider; the active area is primary text with a thin Cyan underline, while inactive links use secondary text. At mobile widths, brand and theme control sit on the first row, organization and user metadata on the second, and navigation remains within the viewport.
-
-### Invo Visual Treatment
-Removed the visible “Powered by OpenAI” copy; the Invo integration itself is unchanged. The name and invoice/recurring assistant label are the only header text. Dark mode gives the panel a deep `#050D18` surface, a subtle Cyan-tinted border and edge glow, and a slightly elevated conversation surface with a faint static Cyan ambient wash. Starter actions use raised navy prompt chips with a quiet Cyan border and clear hover/focus states. The composer uses a deep input surface, a thin Cyan-tinted border, and a restrained focus glow. Send remains a labeled Cyan button with deep navy text. Champagne remains limited to small assistant/mascot details; ordinary workspace cards do not gain glow.
-
-### Responsive Behavior and Accessibility
-Desktop Invo remains floating; tablet uses the near-full-height bottom sheet; mobile uses the near-full-height panel. At 1024×768 the assistant stays in the form flow; at tablet and mobile sizes the accepted sheet behavior is preserved. Theme-toggle accessible names/tooltips remain intact, Invo controls keep descriptive labels, starter actions are native keyboard-accessible buttons, and focus-visible styling remains explicit. No page-level horizontal overflow or form overlap was seen in the collapsed mobile layout.
-
-### Browser Acceptance
-Reviewed only with the Codex built-in browser at 1440×900, 1024×768, 768×1024, and 390×844. Checked Invoice Workspace, New Invoice, Recurring Workspace, New Recurring Plan, Settings, and Invo open/collapsed. The 1440px workspace showed a clean identity row and a thin underline active state; the 390px header used separate metadata placement without squeezing. Invo showed no “Powered by OpenAI” copy, and its panel, composer, starter chips, and Send action remained readable at desktop, tablet, and mobile sizes. No horizontal overflow was found at the reviewed sizes. No invoice, recurring plan, payment, email, or AI proposal was submitted.
-
-### Checks and Build
-- `npm test`: passed, 201 tests; PDF suite: 8 tests.
-- `npm run typecheck`: passed.
-- `npm run lint`: passed.
-- `npx prisma validate`: passed.
-- `npm run db:migrate:status`: all 14 migrations up to date.
-- `npm audit --omit=dev`: 0 vulnerabilities.
-- `git diff --check`: passed; Git reported only LF-to-CRLF conversion notices.
-- `npm run build`: failed in the existing Turbopack CSS worker (`Failed to write app endpoint /page`; worker exited before connection).
-- `npx next build --webpack`: passed; all application routes compiled.
-
----
-
-## UI-002A — Dark Theme Refinement
-
-### Status
-Implemented on the uncommitted UI-002 work, based on `381223c`. No commit was created. Billing behavior, invoice calculations, recurring logic, OpenAI/Invo proposal behavior, RBAC, schema, routes, and print/PDF rendering were not changed.
-
-### Dark Palette and Surface Hierarchy
-The dark canvas is Midnight navy `#07111F`; the shell/header is `#091426`; cards use `#0D1A2D`; elevated/filter surfaces use `#12223A`; interactive surfaces use `#162944`; inputs use `#0A1729`; table headers use `#102039`; borders use `#223753` and subtle separators use `#192B43`. Primary/secondary/muted text is `#F4F7FB`, `#B5C1D1`, and `#7F91A8`. Cyan actions use `#4DC2D7` with `#63CDE0` hover and `#123849` soft; Champagne detail uses `#D6B36A` and `#3A3020` soft. Semantic colors are success `#55B895`, warning `#D6A54D`, and danger `#E06A64`. Cards remain restrained, rows stay on the base surface with subtle separators, and hover uses the interactive surface.
-
-### Buttons and Theme Preference
-Dark primary actions use Cyan with dark text; secondary actions use a dark bordered surface. The theme control is a 42px square icon-only button. Light mode shows an outline Moon with accessible name “Switch to dark mode” and title “Dark mode”; dark mode shows an outline Sun with accessible name “Switch to light mode” and title “Light mode”. Focus-visible styling is retained. The application follows the OS theme until the user chooses one; an explicit choice persists under the existing `hiiiive-billing-theme` local-storage key and is restored before paint.
-
-### Invo and Accessibility
-The mascot asset is unchanged. The collapsed control has a subtle Champagne edge/glow; the panel uses the dark surface hierarchy, Cyan interaction states, and restrained Champagne details. In dark mode the panel title, starter chips, and icon actions use readable navy surfaces and light text, including hover. Form fields and placeholders remain legible with a visible border and Cyan focus. The UI-002 Invo placement and assistant state behavior are unchanged.
-
-### Browser Acceptance
-Used only the Codex built-in browser. Reviewed the invoice workspace, new invoice form, recurring workspace, new recurring plan, settings, and Invo collapsed/open. At 1440×900 the invoice workspace showed clearly distinct canvas, cards, filters, table header, and input surfaces. At 390×844, the invoice and recurring forms and open Invo panel had no page-level horizontal overflow; fields stayed within the viewport. The toggle showed the Sun in dark mode and Moon in light mode, with the expected accessible names/tooltips. Toggling to light and reloading preserved light mode. No invoice, plan, payment, email, or Invo proposal was submitted. The updated dark styling for Invo icon actions was checked after the final rebuild.
-
-### Automated Checks and Build
-- `npm test`: could not pass in this run because PostgreSQL is unavailable at `localhost:5432`; database integration tests fail to connect. No billing or database code was changed.
-- `npm run typecheck`: passed.
-- `npm run lint`: passed.
-- `npx prisma validate`: passed.
-- `npm run db:migrate:status`: blocked by the unavailable PostgreSQL server (`Schema engine error`).
-- `npm audit --omit=dev`: passed; 0 vulnerabilities.
-- `git diff --check`: passed; Git emitted only LF-to-CRLF conversion notices.
-- `npm run build`: failed in the existing Turbopack CSS worker (`Failed to write app endpoint /page`; child process exited before connection).
-- `npx next build --webpack`: passed; all application routes compiled. A transient Windows `EPERM` on `.next` output cleared on retry.
-
----
-
 ## Task
-UI-002 — Invo Floating Behavior, Button System Polish, and Brand Dark Mode
+QA-001 — Production Readiness, Security & End-to-End Acceptance
 
-## Status
-Implemented on the clean UI-001 baseline `381223c`. No billing rules, invoice math, recurring behavior, payment behavior, authorization, schema, migrations, or OpenAI request/form-apply logic changed.
+## Overall Status
+**NO-GO for production issuance.** The documented internal approval gate is not implemented or enforced, and generalized immutable audit events are not implemented. Browser acceptance was not completed in this run. Several production infrastructure checks remain deployment-stage requirements.
 
-## Files Changed
-- `src/app/globals.css` — theme tokens, button hierarchy/focus treatments, dark component styling, and responsive Invo placement.
-- `src/app/layout.tsx` — system-theme bootstrap before page paint.
-- `src/components/theme-toggle.tsx` — persisted light/dark override with system default.
-- `src/components/master-data/workspace-shell.tsx` — shell toggle placement.
-- `src/app/app/[organizationSlug]/invoices/page.tsx`, `clients/page.tsx`, and `services/page.tsx` — Search/Apply moved to the secondary button treatment.
-- `src/app/app/[organizationSlug]/recurring/page.tsx` — shared field sizing for recurring search.
-- `docs/CODEX_HANDOFF.md` — this handoff and the retained UI-001 record below.
-
-## Dark Mode
-The UI-002A refinement below supersedes UI-002's initial dark canvas palette with the deeper `#07111F` canvas and approved surface hierarchy. Cyan (`#4DC2D7`) remains the primary dark-mode action/interaction color, with Champagne (`#D6B36A`) reserved for draft and assistant details. The theme defaults to the OS preference; a light/dark override is stored under `hiiiive-billing-theme` in local storage. Browser review confirmed the explicit choice survives reload. Print/PDF renderer styles were not changed; invoice document output remains white in dark application mode.
-
-## Invo
-Desktop collapsed Invo stays viewport-fixed at bottom right while scrolling. At tablet and phone widths it moves into the create form flow to leave fields and primary actions clear; the greeting's non-button area allows click-through, while its open and dismiss buttons remain interactive. The tablet panel opens as a near-full-height bottom sheet with its conversation scrolling inside the panel. Conversation/proposal state and existing send/apply logic are unchanged.
-
-## Button System
-Primary actions use Midnight in light mode and Cyan with dark text in dark mode. Secondary actions share the bordered surface style, while existing text controls act as quiet actions and destructive item removals use the danger treatment. Focus rings, disabled states, segmented billing-mode selection, and icon controls retain clear affordances. Search and invoice filters use secondary actions.
-
-## Browser Acceptance
-Reviewed with the Codex in-app browser only at 1440×900, 1024×768, 768×1024, and 390×844. Checked invoice workspace, new invoice, draft edit and preview, issued invoice, payments, send invoice, clients and client detail, services and service detail, recurring workspace, new recurring plan, recurring detail, and settings. Invo remained fixed during desktop scroll, its narrow greeting no longer covered fields, and the tablet panel opened in a usable bottom-sheet position. The explicit theme switch persisted across reload. No page-level horizontal overflow was visible at the reviewed narrow widths. No invoice, recurring plan, payment, or email form was submitted; no live Invo proposal request was sent.
-
-## Automated Checks and Build
-- `npm test`: 201 passed; PDF suite: 8 passed.
-- `npm run typecheck`: passed.
-- `npm run lint`: passed.
-- `npx prisma validate`: passed.
-- `npm run db:migrate:status`: all 14 migrations up to date.
-- `npm audit --omit=dev`: 0 vulnerabilities.
-- `git diff --check`: passed; Git emitted only line-ending conversion notices.
-- `npm run build`: failed in the existing Turbopack CSS worker while parsing the global stylesheet (`Failed to write app endpoint /page`; worker exited before connection).
-- `npx next build --webpack`: passed; all routes compiled.
-
-## Limitations and Suggested Next Step
-The default Turbopack CSS worker issue remains; the webpack production build passes. Browser checks were visual and accessibility-tree based; no live model proposal was requested. Review the final diff, then commit UI-002.
-
----
-
-## UI-001 Handoff (History)
-
-## Task
-UI-001 — Hiiiive Billing Design System & Final UX Polish
-
-## Status
-Implemented. Automated tests, typecheck, lint, Prisma validation, dependency audit, migration status, and the webpack production build passed. The default Turbopack build failed in its existing CSS worker. Built-in browser review covered the required routes at its available viewport, but exact viewport sizing and open-panel/proposal acceptance remain incomplete.
+No application code or migration was changed. This file is the QA-001 handoff. No commit was created.
 
 ## Repository Baseline
-Repository: `D:\Billing_Hive\hiiiive-billing`. Task began on a clean working tree at `8e8c571 feat: add Invo conversational billing assistant`, following `ed8f82c feat: add recurring invoices and draft autosave`.
+- Repository: `D:\Billing_Hive\hiiiive-billing`
+- Branch: `main`
+- HEAD: `310ef67 chore: document production environment and add security headers`
+- `git status --short` was clean at start. It contains only this handoff edit at completion.
+- Previous history includes recurring/autosave, Invo, UI-001, and UI-002 commits.
+- Node `v24.20.0`; npm `11.19.0`; project requires Node `>=24 <25`.
+- Prisma schema validates. There are 14 migration directories.
 
-## Design Tokens
-Central application tokens live in `src/app/globals.css`. They define the brand palette, canvas and surfaces, text hierarchy, semantic states, focus ring, and shared card radius.
+## Defects Found
+- **BLOCKER — Approval gate absent.** Business rules require approval before invoice issuance/email (`docs/BUSINESS-RULES.md`), but the schema has no approval state and the issue/send paths do not enforce approval. The send action checks `INVOICE_SEND` and the invoice’s ISSUED state only. This needs an explicitly approved workflow before deployment; no workflow was invented in QA.
+- **HIGH — General audit trail absent.** The documented immutable audit events for important invoice actions are not implemented. Email attempts and recurring runs have ledgers, but invoice issuance, payment recording, and other important actions do not have a generalized actor/action/reason history. Payment rows also do not identify the user who recorded them.
+- **CONDITIONAL — Browser acceptance incomplete.** The Codex built-in browser could not connect to the local app; the request to launch the server outside the sandbox was rejected. No QA-001 visual or accessibility pass is claimed. The prior UI-002 handoff contains earlier browser observations, but those do not replace this run’s acceptance.
+- **CONDITIONAL — Canonical Turbopack build fails.** Reproduced in sandbox and outside it at `globals.css`: Turbopack exits while creating the CSS worker and fails to write `/page`. The separate webpack build passes outside the sandbox.
 
-## Brand Palette
-- Midnight: `#0E1A2E` — primary authority, headings, and business actions.
-- Cyan: `#4DC2D7` — selected states, focus, and interaction accents.
-- Champagne: `#D6B36A` — restrained Draft and Invo detail.
+## Fixes Applied
+None. The committed `.env.example` placeholder sanitization, optional Chromium path documentation, and security headers were accepted as baseline and reviewed. No QA application fixes were justified without changing business workflow or broader architecture.
 
-## Button System
-Primary actions use Midnight with white text; secondary actions use white with a Midnight label and border; contextual payment actions use a restrained Cyan surface; destructive item removal uses the existing danger semantic. Disabled controls retain readable text and a visible neutral surface.
+## Build
+- **Canonical `npm run build`: FAIL.** Reproduced outside the sandbox with `Failed to write app endpoint /page`; Turbopack’s CSS worker exits before connection.
+- **Fallback `npx next build --webpack`: PASS** outside the sandbox. It compiled, type-checked, generated all static pages, and collected build traces.
 
-## Form System
-Inputs share border, radius, height, spacing, placeholder, disabled, and Cyan focus treatments. Validation keeps the existing business rules and uses semantic danger/success surfaces.
+## Database / Migrations
+- `npx prisma validate`: PASS.
+- Local PostgreSQL accepted connections on `localhost:5432` when checked outside the sandbox.
+- `npm run db:migrate:status`: PASS; 14 migrations found, schema up to date, no pending migrations reported.
+- Static schema/migration review found tenant-scoped composite relations, organization-scoped invoice number uniqueness and sequence key, unique recurring occurrence relation, a single active default template index, and immutability triggers for template versions/email attempts.
+- No historical migration was changed. Production database network exposure is not verifiable locally.
 
-## Navigation
-The permission-filtered workspace navigation uses compact text links, Midnight labels, and a Cyan underline for the active area. Route and permission behavior is unchanged.
+## Authentication
+Identity implementation requires Cloudflare Access JWT verification with RS256/JWKS, configured issuer/audience, `exp`, `sub`, and email; invalid identity fails closed. Tests cover missing/malformed/wrong-audience/expired/not-before/required-claim cases and development identity rejection in production. No live Cloudflare Access deployment was available to test.
 
-## Status System
-Existing status values map to visual semantics: Draft/unpaid amber, issued/partial cyan, paid/active success, and void/failed danger; superseded, inactive, and never-sent remain neutral. No lifecycle or payment state was changed.
+## RBAC
+Central role matrix is enforced in server helpers. PostgreSQL tests passed for the role matrix and active/inactive/foreign membership resolution. ADMIN has all declared permissions; BILLING has billing, master-data, recurring, and Invo permissions; VIEWER has invoice/payment read only. Mutation actions independently resolve membership and permission. No user/membership administration workflow is implemented despite the declared `USER_ADMIN` permission.
 
-## Invoice Workspace
-Shared table, summary, row, filter, and mobile-card styling uses the common surfaces, borders, typography, and semantic status treatments.
+## Tenant Isolation
+Database-backed tests passed for cross-organization invoice, client/service, payment, issuance, document, and mutation denial. Queries and Server Actions derive organization IDs from active memberships and scope records by organization. Composite foreign keys provide a second tenant boundary. No external browser attack attempt was made.
 
-## Invoice Entry
-The existing form flow remains intact. Item amount hierarchy is stronger, billing-mode selection has a clear Cyan selected state, and move/remove actions have labels, tooltips, visible focus, legible disabled states, and a restrained trash icon.
+## Financial Integrity
+Money uses Prisma Decimal with database `Decimal(19,4)` fields. Line totals round to four decimals using half-up; subtotal and discount use Decimal arithmetic. Tests passed for quantity/flat-fee canonicalization, server-derived totals, invalid discounts, tenant ownership, concurrent draft updates, and preservation of issued snapshots. No floating-point financial authority was found in the reviewed calculation paths.
 
-## Summary / Financial Hierarchy
-The Summary emphasizes Amount payable in Midnight and remains a sticky desktop summary only above tablet widths. The duplicate summary-level Save now action was removed; the main action row retains the explicit fallback.
+## Draft / Autosave
+Full-draft atomic update and autosave single-flight tests passed. Drafts remain unnumbered; autosave requires valid client/currency/item input and failed saves retain the form for retry.
+
+## Invoice Lifecycle
+Issuance locks the draft, validates financials and template, freezes client/template data, and commits issue state with number reservation. Tests passed for concurrency, rollback, immutability and reissuance denial. **The required approval prerequisite is missing (BLOCKER above).**
+
+## Invoice Numbering
+Local integration tests passed for sequential and concurrent allocation, no draft reservation, rollback, and Asia/Colombo date formatting. Before production issuance, inspect real historical production invoices and initialize the organization-wide next sequence to the highest historical suffix plus one. No local sequence value is approved for production use.
 
 ## Payments
-Payment totals use the shared card system and Midnight financial values; balance due remains clear without bright colored blocks. Payment permissions, calculations, and recording behavior are unchanged.
+Database integration tests passed for partial/full/overpayment state, positive amounts, eligible lifecycle, tenant scope, concurrency, append-only history, and read-model reconciliation. Payments do not alter invoice grand total. Production actor attribution/audit remains a gap.
+
+## PDF / Document Integrity
+PDF suite passed 8/8 outside the sandbox, including one-page A4 output, text escaping, trusted renderer/config, bundled fonts, and no invoice mutation. Issued documents use frozen snapshots/template versions. Production requires an installed Chromium executable configured through absolute `PUPPETEER_EXECUTABLE_PATH`, a non-root runtime, and usable Chromium sandbox. The local `.env` has no explicit path; local tests resolve installed Chrome.
+
+## Email / SMTP
+Email code authorizes only issued invoices, validates recipient groups, keeps BCC out of message headers/client history, snapshots attempts, and does not mutate invoice/payment state. A safe SMTP verify/authentication check against the configured local endpoint **passed**; no message was sent. Production Stalwart mailbox, TLS certificate, sender/domain, SPF/DKIM/DMARC, and recipient delivery remain deployment checks. Approval enforcement is absent (BLOCKER).
 
 ## Clients / Services
-List, mobile cards, forms, search, active/inactive status, and action styling share the same design system. Existing CRUD behavior is unchanged.
+PostgreSQL integration tests passed for scoped search, pagination, validation, authorization, and prospective service defaults. Client/contact/service relations are tenant-scoped; no hard delete exists.
 
-## Recurring
-Workspace, forms, plan details, and run history use shared table, form, and status treatments. Scheduling and run behavior are unchanged.
+## Settings / Template Versioning
+Settings integration tests passed; writes create prospective immutable versions and issued invoices remain frozen. DB constraints/triggers protect template history and issuance bindings.
 
-## Settings
-Organization settings retain their existing editable/preview grouping and immutable template-version workflow, with shared field and surface styling.
+## Recurring Billing
+Integration tests passed for draft-only generation, idempotency, concurrent retry, inactive-client failures, price freezing, schedule anchoring, short-month/leap-day behavior, and resume without backlog. Generated plans do not issue, number, email, or record payments.
 
-## Invo Integration
-The existing mascot asset remains unchanged. The panel uses the application surfaces, Cyan interactions, Midnight text, and restrained Champagne accents. Its greeting, proposal, and chat state behavior are unchanged.
+## Cron Security
+Cron route tests passed for missing, malformed, wrong, and matching bearer secrets, timing-safe comparison, and safe responses. The local environment has no recurring secret configured. Production must use a random secret of at least 32 characters and an authenticated scheduler; endpoint exposure and secret rotation remain deployment checks.
 
-## Responsive Behavior
-The Codex in-app browser displayed a wide invoice workspace and a narrow responsive workspace/form. Its current viewport could not be set to the requested exact 1440, 1024, 768, and 390 sizes. CSS stacks the form summary through 1060px, and places Invo in normal flow at 1060px or below and on short desktop viewports.
+## Invo / OpenAI
+Invo tests passed for bounded structured output, target locking, deterministic tenant-safe resolution, and safe errors. A minimal `store:false` API smoke request using the configured model completed successfully, confirming current API key/model access and usable API quota. The key is local `.env` configuration, ignored by Git and not referenced in client components. Deployment secret-manager configuration and production project ownership remain unverified.
 
-## Accessibility
-Focused controls use a Midnight outline plus Cyan ring; disabled buttons use a darker neutral label for readability. The narrow browser screenshot confirmed the Invo control no longer covers Payment Terms. A complete keyboard/contrast audit remains unverified.
+## UI / Responsive
+The committed UI baseline has prior browser checks recorded in the earlier handoff. QA-001 did not repeat those checks because the local server could not be reached from the Codex built-in browser and the outside-sandbox server request was rejected. No live form, invoice, plan, payment, or email was submitted.
 
-## Print / PDF Safety
-`src/app/invoice-print.css` and the invoice renderer were not edited. The 8-test PDF suite passed and confirms one-page A4 output generation.
+## Theme / Accessibility
+Prior UI-002 handoff records light/dark persistence and responsive checks. Full keyboard navigation, contrast measurement, screen-reader flow, and current QA-001 viewport review remain unverified.
 
-## Browser Acceptance
-Used only the Codex in-app browser. Reviewed Invoice Workspace, New Invoice, saved Draft Invoice, Draft Preview, Issued Invoice, Payments, Send Invoice, Clients and Client Detail, Services and Service Detail, Recurring Workspace, New Recurring Plan, Recurring Plan Detail, and Settings. Invo was observed collapsed on both create pages. Exact 1440/1024/768/390 viewport overrides were unavailable. Clicking the Invo control did not open its panel through this browser surface; open-panel and proposal-state visual acceptance remain unverified. The prior INV-031 handoff records the configured OpenAI key as expired, so no live prompt was sent. No invoice, plan, email, or payment was created or changed during acceptance.
+## Environment Variables
+`.env.example` contains sanitized example placeholders, documents the optional server Chromium path, and contains no real credentials. Local `.env` has database, dev identity, OpenAI, SMTP, and sender values; Cloudflare Access, cron secret, and explicit Chromium path were absent. The actual values were not printed. Production values must be set in the deployment secret manager, not copied from local development.
+
+## Secrets Audit
+`.env` is ignored and untracked. A client-source scan found no references to `DATABASE_URL`, `OPENAI_API_KEY`, `SMTP_PASSWORD`, Cloudflare audience, or recurring secret. No secret values were written to QA output. Deployment secret-manager contents cannot be independently verified.
+
+## Security / Logging
+JWT verification, centralized RBAC, tenant-scoped services, safe SMTP error handling, bounded Invo diagnostics, fixed cron errors, and email attempt immutability were reviewed; related tests passed. General immutable business audit events are missing (HIGH). No CSP or HSTS is emitted by `next.config.ts`; configure and verify transport/security policy at the production edge as appropriate.
+
+## Deployment Architecture
+Required path: Internet → Cloudflare → Cloudflare Access with mandatory MFA → `billing.hiiiive.lk` → reverse proxy → Next.js → application authentication/RBAC → private PostgreSQL. The origin should accept application traffic only through the trusted edge.
+
+## Cloudflare Access / MFA
+Deployment acceptance: direct origin access FAIL; unapproved identity FAIL; approved identity without required MFA FAIL; approved identity with MFA PASS; authorized application role PASS. These checks were not executable locally. Configure team domain/audience and ensure JWT assertion reaches the app without trusting unsigned identity headers.
+
+## Database Exposure
+Production PostgreSQL port 5432 must not be publicly exposed. Verify from an external network that public DB access fails; keep app-to-DB traffic on a private network. Not verified here.
+
+## Backup / Recovery
+No production backup configuration or restore evidence was available. Configure encrypted automated backups, retention, and point-in-time recovery as appropriate; perform and record a restore test before launch.
+
+## Production Sequence Initialization
+BLOCKING operational step: review real historical production invoice numbers, identify the highest organization-wide numeric suffix, then initialize the sequence to suffix + 1. Do not infer this from local data.
+
+## Production Settings
+Before launch, verify real invoice display/company name, bank name, account name/number, primary color, organization settings, SMTP sender, and recipient-facing document output. Local values are not production approval.
 
 ## Automated Checks
-Final results:
-- `npx prisma validate`: passed.
-- `npm test`: 201 passed; PDF suite: 8 passed.
-- `npm run typecheck`: passed.
-- `npm run lint`: passed.
-- `npm run build`: failed in the Turbopack CSS worker (`Failed to write app endpoint /page`; CSS child process exited before connecting), matching the previously recorded environment failure.
-- `npx next build --webpack`: passed; all invoice, client, service, recurring, and settings routes compiled.
-- `npm run db:migrate:status`: all 14 migrations are up to date.
-- `npm audit --omit=dev`: 0 vulnerabilities.
-- `git diff --check`: passed; Git reported only line-ending conversion notices.
+- `npm test`: PASS, 201 tests, 26 suites.
+- PDF suite: PASS, 8 tests.
+- `npm run typecheck`: PASS.
+- `npm run lint`: PASS.
+- `npx prisma validate`: PASS.
+- `npm run db:migrate:status`: PASS, all 14 migrations applied.
+- `npm audit --omit=dev`: PASS, 0 vulnerabilities.
+- `git diff --check`: PASS before handoff edit; rerun after final edits.
+- Canonical build: FAIL; webpack fallback: PASS (separate results above).
 
-## Migration Status
-No schema change or migration was created. The database reports all 14 migrations up to date.
+## Browser Acceptance
+Not completed in QA-001. Codex built-in browser could not connect to local Next.js; the request to run the local server outside the sandbox was rejected. The app was not accepted visually in this run. No production browser access-control tests were performed.
 
-## Known Limitations
-Exact responsive viewport checks and Invo open/proposal visuals could not be completed in the available built-in browser. The standard Turbopack build remains unavailable in this environment; webpack production build passes. The prior Invo handoff records an expired OpenAI API key, preventing live proposal generation.
+## Deployment Go / No-Go Matrix
+| Area | Status | Evidence / remaining check |
+|---|---|---|
+| Build | CONDITIONAL | Webpack build passes; canonical Turbopack build fails reproducibly. |
+| Database | CONDITIONAL | Local schema valid; production connectivity/exposure unverified. |
+| Migrations | GO (local) | 14 applied; no pending migrations reported. |
+| Authentication | CONDITIONAL | Offline JWT tests pass; live Cloudflare/MFA gate untested. |
+| RBAC | GO (code) | Role and membership tests pass; `USER_ADMIN` workflow absent. |
+| Tenant isolation | GO (code) | PostgreSQL cross-tenant tests pass; production boundary untested. |
+| Financial calculations | GO (code) | Decimal/integration tests pass. |
+| Invoice lifecycle | **NO-GO** | Documented approval prerequisite is absent. |
+| Invoice numbering | CONDITIONAL | Local concurrency tests pass; production sequence must be initialized from history. |
+| PDF | CONDITIONAL | Suite passes; install/configure production Chromium and verify host runtime. |
+| Email | CONDITIONAL | SMTP verify passed locally; production Stalwart/domain checks and approval gate remain. |
+| Payments | GO (code) | Integration and concurrency tests pass; actor audit missing. |
+| Recurring | GO (code) | Integration/schedule tests pass; production scheduler/secret unverified. |
+| Cron | CONDITIONAL | Route auth tests pass; production secret and scheduler unverified. |
+| Invo/OpenAI | CONDITIONAL | Current API smoke passes; deployment secret manager unverified. |
+| UI/responsive/accessibility | CONDITIONAL | Prior baseline evidence only; QA-001 browser review incomplete. |
+| Secrets | CONDITIONAL | Local ignore/client scan good; deployment secret manager unverified. |
+| Cloudflare / origin | CONDITIONAL | Required architecture documented; edge/MFA/direct-origin tests outstanding. |
+| Database exposure | CONDITIONAL | Verify port 5432 is private and public access fails. |
+| Backups / recovery | CONDITIONAL | No evidence; configure and test restore. |
+| Audit trail | **NO-GO** | General immutable actor/action history absent. |
+
+## Blockers
+1. Implement or explicitly resolve the documented approval workflow and enforce it before issuance/email.
+2. Implement the documented immutable audit trail for important invoice/payment actions, or obtain a documented business/security decision that changes that requirement.
+3. Resolve the canonical Turbopack production-build failure or formally accept the webpack build as the deployment build command.
+
+## Conditional Deployment Checks
+- Complete built-in-browser UI, responsive, dark/light, keyboard, and accessibility acceptance.
+- Verify Cloudflare Access with required MFA, origin bypass failure, approved/unapproved identities, and application roles.
+- Verify PostgreSQL is private and unreachable publicly; configure and restore-test backups.
+- Initialize production invoice numbering from historical production invoices.
+- Verify production settings, Stalwart SMTP/domain, OpenAI project/key/model/quota in secret manager, recurring cron secret/scheduler, and Chromium runtime.
 
 ## Suggested Next Step
-QA-001 — Production Readiness / Security / End-to-End Acceptance
+Resolve the approval and audit requirements before a production freeze. Then complete browser acceptance and deployment-stage Cloudflare, database, backup, sequence, settings, mail, secret-manager, and runtime checks. Do not issue real invoices until production sequence initialization is verified.
